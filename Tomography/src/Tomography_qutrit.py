@@ -60,6 +60,7 @@ class tomography_pol_qutrit:
     self.A00 = [diag([1,0,0]), diag([0,1,0]), diag([0,0,1])]
     self.projectors = tomography_pol_qutrit.matrix_P(self)
     self.B = tomography_pol_qutrit.matrix_B(self)
+    
     # отдельные состояние которые удобно использовать
     self.hh = array([[1], [0], [0]])
     self.hv = array([[0], [1], [0]])
@@ -69,8 +70,15 @@ class tomography_pol_qutrit:
     self.dd = array([[1 / 2], [1 / (2)**0.5], [1 / 2]])
     self.ll = array([[1 / 2], [-1j / (2)**0.5], [-1 / 2]])
 
-  # Превращение матрицы плотности в матрицу состояния кутрита
+  
   def psi(self, r):
+    """
+    Превращение матрицы плотности в матрицу состояния кутрита.
+    Args:
+      r: матрица плотности.
+    Return:
+      Полученный вектор состояния.
+    """
     S, V, D = linalg.svd(r, full_matrices = True, compute_uv = True)
     N = len(V)
     K = (ones((N, N)) + V - ones((N, N)))
@@ -81,8 +89,14 @@ class tomography_pol_qutrit:
     psi = S @ K**0.5  # убедиться что праильный корень
     return psi
 
-  # Превращение матрицы состояния кутрита в матрицу плотности
   def density(self, psi):
+    """
+      Превращение матрицы состояния кутрита в матрицу плотности ρ = |ψ><ψ|.
+    Args:
+      psi: вектор состояния ψ.
+    Return:
+      Матрица плотности ρ.
+    """
     return psi @ (conj(psi)).T
   
   def matrix_P(self):
@@ -106,9 +120,16 @@ class tomography_pol_qutrit:
       return B
 
   def Fidelity(self, r, r_t):
+     """
+     Точность двух состояний по Ульману.
+     Args:
+        r: матрица плотности первого состояния. 
+        r_t: матрица плотности второго состояния.
+     Return:
+        Мера близости двух состояний.
+     """
      return (trace(sqrtm(sqrtm(r) @ r_t @ sqrtm(r))))**2
 
-  # Мeтод псевдоинверсии
   def psevdoin(self, p, rank: int=1):
     """
       Выполняет метод псевдоинверсии для правила Борна p = B @ R, где p, R - столбцы вероятностей и элементов
@@ -156,8 +177,7 @@ class tomography_pol_qutrit:
     R = R / trace(R)
     return R
 
-  # Метод простых итерций
-  def result(self, p, r0, k, sigma, epsilon, max_iter=1000, alpha=0.5):
+  def result(self, r0, k, sigma, epsilon, max_iter=1000, alpha=0.5):
         """
           Решение уравнения A(psi) @ psi = Q @ psi  методом простой итерации, где
         psi_(i+1) = (1 - a) * Q^(-1) @ A @ psi_i + a * psi_i. В нашем случае 
@@ -200,7 +220,6 @@ class tomography_pol_qutrit:
         Rx = Rx / trace(Rx)
         return Rx
 
-  #Обработка эксперимента
   def experiment(self, k, start_state, sigma1, sigma2, sigma3, rank: int=1,\
                  epsilon: float=1.0e-11, max_iter: int=1000, alpha: float=0.5, visible: bool=True):
       """
@@ -208,17 +227,17 @@ class tomography_pol_qutrit:
       Args:
         k(float): экспериментальные частоты.
         start_state: идеальное состояние.
-        sigma1(float): частоты для HH
-        sigma2(float): частоты для HV
-        sigma3(float): частоты для VV
-        rank(int): ранг восстанавлиемой матрицы плотности
-        epsilon: точность метода итераций
-        max_iter: максимальное число итераций в методе итераций
+        sigma1(float): частоты для HH.
+        sigma2(float): частоты для HV.
+        sigma3(float): частоты для VV.
+        rank(int): ранг восстанавлиемой матрицы плотности.
+        epsilon: точность метода итераций.
+        max_iter: максимальное число итераций в методе итераций.
         alpha: параметр метода итераций.
-        visible(bool): параметр при котором показывается фиделити между идеальным и восстановленным состоянием
+        visible(bool): параметр при котором показывается фиделити между идеальным и восстановленным состоянием.
       Return:
         Fidelity по ульману между идеальной матрицей и матрицей псевдоинверсии и между идеальной матрицей и восстановленной
-      матрицей
+      матрицей.
       """
 
       # предобработка
@@ -229,7 +248,7 @@ class tomography_pol_qutrit:
       k = list(k[::3]) + list(k[1::3]) + list(k[2::3])
       p = array(list(ph) + list(phv) + list(pv))
       self.matrix_psevdoin = self.psevdoin(p.reshape(3 * self.len_protocol, 1), rank=rank)                               #Нахождение матрицы плотности с помощью псевдоинверсии
-      self.matrix_finish = self.result(p, self.matrix_psevdoin, k, [sigma1,sigma2,sigma3], epsilon, max_iter, alpha)      #Полученная матрицы с помощью метода простых итераций
+      self.matrix_finish = self.result(self.matrix_psevdoin, k, [sigma1,sigma2,sigma3], epsilon, max_iter, alpha)      #Полученная матрицы с помощью метода простых итераций
 
       if visible == True:
           print("Fidelity between start matrix density and matrix pseudoinversion =", abs(self.Fidelity(self.matrix_psevdoin, self.start_density)))
