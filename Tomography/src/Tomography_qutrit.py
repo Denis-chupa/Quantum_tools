@@ -1,4 +1,4 @@
-from numpy import array, linalg, ones, conj, trace, zeros, column_stack, full, hstack, cos, sin, pi
+from numpy import array, linalg, ones, conj, trace, zeros, column_stack, full, hstack, cos, sin, pi, diag
 from scipy.linalg import sqrtm
 
 
@@ -55,12 +55,9 @@ def Gl_8(Q):
 class tomography_pol_qutrit:
   def __init__(self, protokol_angles : list):
 
-    self.epsilon=1.0e-11
     self.angles = protokol_angles
-    self.A01 = array([[1,0,0],[0,0,0],[0,0,0]])
-    self.A02 = array([[0,0,0],[0,1,0],[0,0,0]])
-    self.A03 = array([[0,0,0],[0,0,0],[0,0,1]])
-    self.A00 = [self.A01, self.A02, self.A03]
+    self.len_protocol = len(self.angles)
+    self.A00 = [diag([1,0,0]), diag([0,1,0]), diag([0,0,1])]
     self.A = tomography_pol_qutrit.matrix_A(self)
     self.B = tomography_pol_qutrit.matrix_B(self)
     self.hh = array([[1], [0], [0]])
@@ -89,20 +86,20 @@ class tomography_pol_qutrit:
 
   # Вспомогательные функции
   def kh(self, k):
-      k0 = 1j * ones(len(self.angles))
-      for i in range(len(self.angles)):
+      k0 = 1j * ones(self.len_protocol)
+      for i in range(self.len_protocol):
         k0[i] = k[3 * i]
       return k0
   
   def khv(self, k):
-      k0 = 1j * ones(len(self.angles))
-      for i in range(len(self.angles)):
+      k0 = 1j * ones(self.len_protocol)
+      for i in range(self.len_protocol):
         k0[i] = k[3 * i + 1]
       return k0
   
   def kv(self, k):
-      k0 = 1j * ones(len(self.angles))
-      for i in range(len(self.angles)):
+      k0 = 1j * ones(self.len_protocol)
+      for i in range(self.len_protocol):
         k0[i] = k[3 * i + 2]
       return k0
   
@@ -110,25 +107,25 @@ class tomography_pol_qutrit:
       return array(list(k1) + list(k2) + list(k3))
   
   def SUMK1(self, k1, k2, k3):
-      k0 = 1j * ones(3 * len(self.angles))
-      for i in range(len(self.angles)):
+      k0 = 1j * ones(3 * self.len_protocol)
+      for i in range(self.len_protocol):
         k0[3 * i : 3 * i + 1] = [k1[i], k2[i], k3[i]]
       return k0
   
   def matrix_A(self):
-    A = 1j * ones((3 * len(self.angles), 3, 3))
+    A = 1j * ones((3 * self.len_protocol, 3, 3))
     k = 0
     for i in range(3):
-      for j in range(len(self.angles)):
+      for j in range(self.len_protocol):
         A[k] = array(conj(self.angles[j]).T @ self.A00[i] @ self.angles[j])
         k+=1
     return A
   
   def matrix_B(self):
-      B = 1j * ones((3*len(self.angles),9))
+      B = 1j * ones((3 *self.len_protocol,9))
       k = 0
       for i in range(3):
-        for j in range(len(self.angles)):
+        for j in range(self.len_protocol):
           B[k] = array((conj(self.angles[j]).T @ self.A00[i] @ self.angles[j]).flatten())
           k+=1
       return B
@@ -138,19 +135,31 @@ class tomography_pol_qutrit:
      return (trace(sqrtm(sqrtm(r) @ r_t @ sqrtm(r))))**2
 
   # Мeтод псевдоинверсии
-  def psevdoin(self, p):
+  def psevdoin(self, p, rank: int=1):
+    """
+      Выполняет метод псевдоинверсии для правила Борна p = B @ R, где p, R - столбцы вероятностей и элементов
+    матрицы плотности соответственно, B - матрица протокольных измерений. При этом B представляется через SVD разложение.
+    Args:
+      p: вектор вероятностей
+      rank(int): ранг позвращаемой матрицы плотности.
+    Return:
+      Нормированная матрица плотности с рангом rank.
+    """
     R = linalg.pinv(self.B) @ p
     R = array([[R[0][0], R[3][0], R[6][0]],[R[1][0], R[4][0], R[7][0]],[R[2][0], R[5][0], R[8][0]]])
-    # s, w, v = linalg.svd(self.B)
-    # print("sing =",abs(w))
     D1, V1 = linalg.eigh(R)
     N = len(D1)
+    
+    # зануляются отрицательные собственные значения
     for j in range(N):
           if D1[j] < 0:
             D1[j] = 0
+
     D1 = sorted(D1, reverse = True)
     D1 = D1 / linalg.norm(D1)
     matrix = zeros((N,N))
+
+    # создаётся матрица на диагонали которой собственные значения по убыванию
     for j in range(N):
       for i in range(N):
         if (i == j):
@@ -168,13 +177,14 @@ class tomography_pol_qutrit:
     V1 = column_stack([V13, V12, V11])
     R = V1.dot(D1)
     PSI = self.psi(R)
-    PSI = PSI[:, :1]
+    PSI = PSI[:, :rank]
     R = self.density(PSI)
     R = R / trace(R)
     return R
 
   # Метод простых итерций
-  def result(self, p, P, r0, k=[0,0], epsilon = 1.0e-11, sigma=[0,0], max=1000, alpha=0.5):
+  def result(self, p, P, r0, k=[0,0], epsilon: float=1.0e-11, sigma=[0,0], max=1000, alpha=0.5):
+        
         N = len(p)
         if (sigma == full(N,0)).all():
           sigma = full(N,7000)
@@ -211,7 +221,7 @@ class tomography_pol_qutrit:
         return Rx
 
   #Обработка эксперимента
-  def experiment(self, k, start_state, sigma1, sigma2, sigma3, visible = True):
+  def experiment(self, k, start_state, sigma1, sigma2, sigma3, rank: int=1, epsilon: float=1.0e-11, visible = True):
 
       sigma = hstack([sigma1,sigma2,sigma3])
 
@@ -225,8 +235,8 @@ class tomography_pol_qutrit:
       k3 = pv * sigma3[1]
       k = self.SUMK(k1, k2, k3)
       p = self.SUMK(ph, phv, pv)
-      r0 = self.psevdoin(p.reshape(3 * len(self.angles), 1))                   #Нахождение матрицы плотности с помощью псевдоинверсии
-      Rx = self.result(p, self.A, r0, k, self.epsilon, sigma)                  #Полученная матрицы с помощью метода простых итераций
+      r0 = self.psevdoin(p.reshape(3 * self.len_protocol, 1), rank=rank)      #Нахождение матрицы плотности с помощью псевдоинверсии
+      Rx = self.result(p, self.A, r0, k, epsilon, sigma)                     #Полученная матрицы с помощью метода простых итераций
 
       self.matrix_psevdoin = r0
       self.matrix_finish = Rx
