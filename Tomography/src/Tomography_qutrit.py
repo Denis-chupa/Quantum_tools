@@ -53,7 +53,7 @@ def Gl_8(Q):
   return M
 
 class tomography_pol_qutrit:
-  def __init__(self, protokol_angles : list):
+  def __init__(self, protokol_angles: list):
 
     self.angles = protokol_angles
     self.len_protocol = len(self.angles)
@@ -113,23 +113,24 @@ class tomography_pol_qutrit:
       return k0
   
   def matrix_A(self):
-    A = 1j * ones((3 * self.len_protocol, 3, 3))
-    k = 0
+    """
+      Создание набора проекторов измерения для заданного протокола на базисные состояния HH, VV, HV.
+    """
+    A = ones((3 * self.len_protocol, 3, 3), dtype=complex)
     for i in range(3):
       for j in range(self.len_protocol):
-        A[k] = array(conj(self.angles[j]).T @ self.A00[i] @ self.angles[j])
-        k+=1
+        A[i * self.len_protocol + j] = array(conj(self.angles[j]).T @ self.A00[i] @ self.angles[j])
     return A
   
   def matrix_B(self):
-      B = 1j * ones((3 *self.len_protocol,9))
-      k = 0
-      for i in range(3):
-        for j in range(self.len_protocol):
-          B[k] = array((conj(self.angles[j]).T @ self.A00[i] @ self.angles[j]).flatten())
-          k+=1
+      """
+        Создание матрицы протокольных измерений. Где каждая строчка - это
+      проекторы измерения для заданного протокола на базисные состояния HH, VV, HV.
+      """
+      B = ones((3 * self.len_protocol, 9), dtype=complex)
+      for index, el in enumerate(self.A):
+          B[index] = array(el.flatten())
       return B
-
 
   def Fidelity(self, r, r_t):
      return (trace(sqrtm(sqrtm(r) @ r_t @ sqrtm(r))))**2
