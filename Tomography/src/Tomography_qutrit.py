@@ -58,7 +58,7 @@ class tomography_pol_qutrit:
     self.angles = protokol_angles
     self.len_protocol = len(self.angles)
     self.A00 = [diag([1,0,0]), diag([0,1,0]), diag([0,0,1])]
-    self.A = tomography_pol_qutrit.matrix_A(self)
+    self.projectors = tomography_pol_qutrit.matrix_P(self)
     self.B = tomography_pol_qutrit.matrix_B(self)
     self.hh = array([[1], [0], [0]])
     self.hv = array([[0], [1], [0]])
@@ -83,36 +83,8 @@ class tomography_pol_qutrit:
   # Превращение матрицы состояния кутрита в матрицу плотности
   def density(self, psi):
     return psi @ (conj(psi)).T
-
-  # Вспомогательные функции
-  def kh(self, k):
-      k0 = 1j * ones(self.len_protocol)
-      for i in range(self.len_protocol):
-        k0[i] = k[3 * i]
-      return k0
   
-  def khv(self, k):
-      k0 = 1j * ones(self.len_protocol)
-      for i in range(self.len_protocol):
-        k0[i] = k[3 * i + 1]
-      return k0
-  
-  def kv(self, k):
-      k0 = 1j * ones(self.len_protocol)
-      for i in range(self.len_protocol):
-        k0[i] = k[3 * i + 2]
-      return k0
-  
-  def SUMK(self, k1, k2, k3):
-      return array(list(k1) + list(k2) + list(k3))
-  
-  def SUMK1(self, k1, k2, k3):
-      k0 = 1j * ones(3 * self.len_protocol)
-      for i in range(self.len_protocol):
-        k0[3 * i : 3 * i + 1] = [k1[i], k2[i], k3[i]]
-      return k0
-  
-  def matrix_A(self):
+  def matrix_P(self):
     """
       Создание набора проекторов измерения для заданного протокола на базисные состояния HH, VV, HV.
     """
@@ -128,7 +100,7 @@ class tomography_pol_qutrit:
       проекторы измерения для заданного протокола на базисные состояния HH, VV, HV.
       """
       B = ones((3 * self.len_protocol, 9), dtype=complex)
-      for index, el in enumerate(self.A):
+      for index, el in enumerate(self.projectors):
           B[index] = array(el.flatten())
       return B
 
@@ -184,30 +156,39 @@ class tomography_pol_qutrit:
     return R
 
   # Метод простых итерций
-  def result(self, p, P, r0, k=[0,0], epsilon: float=1.0e-11, sigma=[0,0], max=1000, alpha=0.5):
-        
-        N = len(p)
-        if (sigma == full(N,0)).all():
-          sigma = full(N,7000)
-        if (k == full(N,0)).all():
-          k = sigma * p
+  def result(self, p, r0, k, sigma, epsilon, max_iter=1000, alpha=0.5):
+        """
+          Решение уравнения A(psi) @ psi = Q @ psi  методом простой итерации, где
+        psi_(i+1) = (1 - a) * Q^(-1) @ A @ psi_i + a * psi_i. В нашем случае 
+        A = Σ(k_j / p_j) * P_j, Q = Σσ_j * P_j
+        Args:
+          p(list): экспериментальные вероятности измерений
+          r0: начальное приближение psi_0
+          epsilon: точность метода
+          k: частоты получаемые в эксперименте
+          sigma: экспериментальные отклонения для соотношений между HH, HV, VV
+          max_iter: максимальное количество сделанных итераций 
+          alpha: коэффициент схождения метода.
+        """
+
+        N = 3 * self.len_protocol
 
         #Создание матрицы Q
         Q=0
         i=0
         for j in range(0,N):
-          Q=Q+(sigma[j])*P[j]
+          Q += (sigma[j//self.len_protocol]) * self.projectors[j]
 
         #Метод простых итераций
         Psi0 = self.psi(r0)
-        for i in range(max):
+        for i in range(max_iter):
         #Создание матрицы А
           A = 0
           for j in range(0, N):
             if k[j] == 0:
               A = A
             else:
-              A += (k[j] / trace(P[j] @ self.density(Psi0))) * P[j]
+              A += (k[j] / trace(self.projectors[j] @ self.density(Psi0))) * self.projectors[j]
 
           Psi1 = (1 - alpha) * ((linalg.inv(Q)) @ A @ Psi0) + alpha * Psi0
           if abs(linalg.norm(Psi0) - linalg.norm(Psi1)) < epsilon:
@@ -224,20 +205,17 @@ class tomography_pol_qutrit:
   #Обработка эксперимента
   def experiment(self, k, start_state, sigma1, sigma2, sigma3, rank: int=1, epsilon: float=1.0e-11, visible = True):
 
-      sigma = hstack([sigma1,sigma2,sigma3])
+      sigma = [sigma1,sigma2,sigma3]
 
       # предобработка
       self.start_density = self.density(start_state)
-      ph = self.kh(k) / sigma1[1]
-      phv = self.khv(k) / sigma2[1]
-      pv = self.kv(k) / sigma3[1]
-      k1 = ph * sigma1[1]
-      k2 = phv * sigma2[1]
-      k3 = pv * sigma3[1]
-      k = self.SUMK(k1, k2, k3)
-      p = self.SUMK(ph, phv, pv)
+      ph = k[::3] / sigma1
+      phv = k[1::3] / sigma2
+      pv = k[2::3] / sigma3
+      k = list(k[::3]) + list(k[1::3]) + list(k[2::3])
+      p = array(list(ph) + list(phv) + list(pv))
       r0 = self.psevdoin(p.reshape(3 * self.len_protocol, 1), rank=rank)      #Нахождение матрицы плотности с помощью псевдоинверсии
-      Rx = self.result(p, self.A, r0, k, epsilon, sigma)                     #Полученная матрицы с помощью метода простых итераций
+      Rx = self.result(p, r0, k, sigma, epsilon)                              #Полученная матрицы с помощью метода простых итераций
 
       self.matrix_psevdoin = r0
       self.matrix_finish = Rx
