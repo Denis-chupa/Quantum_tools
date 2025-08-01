@@ -45,9 +45,9 @@ class ACT:
     norm_sum_squares = lambda self, x: x/(np.sum(abs(x)**2))**0.5                    
     
     def main(self , rank_psevdoin: int = None, type_ml: str = "default", Z : np.ndarray = None, random_r : np.ndarray = None,\
-              type_solve_semidefinite_program = None, epsilon : np.float16 = 10**-5, max_iters_in_semidefinite_program = 10**7):
+              type_solve_semidefinite_program = None, epsilon_ml : np.float16 = 10**-11, epsilon_act : np.float16 = 10**-5, max_iters_in_semidefinite_program = 10**7):
         
-        self.epsilon = epsilon
+        self.epsilon = epsilon_act
         self.max_iters_in_semidefinite_program = max_iters_in_semidefinite_program
         if rank_psevdoin is None:
           rank_psevdoin = self.r
@@ -100,9 +100,8 @@ class ACT:
             prob_my_class[2 * (k + 1) + i] = v[3 * i + 2]
 
           if type_ml == "default":
-
-            r0 = my_class_ml.psevdoin(np.array(prob_my_class)[:, np.newaxis], rank = self.r)    #Нахождение матрицы плотности с помощью псевдоинверсии
-            R = my_class_ml.result(r0, prob_my_class, [1, 1, 1], epsilon=10**-11)               #Полученная матрицы с помощью метода простых итераций
+            r0 = my_class_ml.psevdoin(np.array(prob_my_class)[:, np.newaxis], rank = rank_psevdoin)    #Нахождение матрицы плотности с помощью псевдоинверсии
+            R = my_class_ml.result(r0, prob_my_class, [1, 1, 1], epsilon=epsilon_ml)                   #Полученная матрицы с помощью метода простых итераций
             R_list[k] = [[str(item) for item in row] for row in R.tolist()]
             fidelity_list[k] = self.Fidelity(R, self.random_r)
             probability = []
@@ -110,16 +109,13 @@ class ACT:
                   probability.append(np.trace(start_protocol[i] @ R))
           elif type_ml == "without_ml":
             probability = v
-          
+
           self.f_max_0, x_max =  self.semidefinite_program(start_protocol[:3], probability[:3], "maximize") # задаю max(f) на нулевом шаге, f = tr{XZ}
           self.f_min_0, x_min =  self.semidefinite_program(start_protocol[:3], probability[:3], "minimize") # задаю min(f) на нулевом шаге, f = tr{XZ}
-          
           semi_max, x_max = self.semidefinite_program(start_protocol, probability, "maximize")
           semi_min, x_min = self.semidefinite_program(start_protocol, probability, "minimize")
-          svx = (semi_max - semi_min)/(self.f_max_0-self.f_min_0)
+          svx = (semi_max - semi_min) / (self.f_max_0 - self.f_min_0)
 
-          
-          
           x_min_list[k] = [[str(item) for item in row] for row in x_min.tolist()]
           x_max_list[k] = [[str(item) for item in row] for row in x_max.tolist()]
           fidelity_x_max_list[k] = self.Fidelity(x_max, self.random_r)
@@ -196,14 +192,13 @@ class ACT:
         else:
           print("unknow mode")
 
-        # prob.solve(max_iters = self.max_iters_in_semidefinite_program)
-        # prob.solve(solver=cp.MOSEK)
-        # prob.solve(solver=cp.ECOS)
         if self.solve_semidef == cp.MOSEK:
           solver_opts = {
-              "MSK_IPAR_INTPNT_MAX_ITERATIONS": self.max_iters_in_semidefinite_program  # Set max iterations for interior-point method
+            "MSK_IPAR_OPTIMIZER": 0,
+            "MSK_DPAR_INTPNT_TOL_REL_GAP": self.epsilon,
+            "MSK_IPAR_INTPNT_MAX_ITERATIONS": self.max_iters_in_semidefinite_program  # Set max iterations for interior-point method
           }
-          prob.solve(solver=self.solve_semidef, mosek_params=solver_opts , eps = self.epsilon)
+          prob.solve(solver=self.solve_semidef, mosek_params=solver_opts)
         elif self.solve_semidef == cp.SCS:
           prob.solve(solver=self.solve_semidef, max_iters = self.max_iters_in_semidefinite_program, eps = self.epsilon)
         elif self.solve_semidef == cp.ECOS:
@@ -216,7 +211,9 @@ class ACT:
           print("Unknown solver")
           return 0
         return prob.value, X.value
-    
+
+convert_dictlist_to_matrix = lambda matrix_str: np.array([[complex(cell) for cell in row] for row in matrix_str])
+
 def save_json_fix_z():
   for epoch in range(10):
     type_protocola = "fedorov"  # может быть "fedorov" или "one_plate" в зависимости от протокола
@@ -334,81 +331,4 @@ def pl_fid_s_cvx(x,y,std,fidelity_mean,fidelity_std):
   # fig.suptitle(f'Comparison of S_cvx and Fidelity with eps = {10**-4}', fontsize=16)
   plt.show()
 
-# np.random.seed(52)
-# # protocol = np.concatenate((oper_fedorov_basis, np.expand_dims(oper_start_protocol_mix[4], axis=0)), axis=0)
-# tomography_1 = ACT(oper_start_protocol_mix, 2, 3)
-# x = np.array([1, 2, 3, 4, 5])
-# svx_list = []         
-# fidelity_list = []
-# N = 1
 
-
-# for i in tqdm(range(N)):
-#   svx_list_one_measurement, fidelity_list_one_measurement, fidelity_x_min, fidelity_x_max, x_min, x_max, state_ml = tomography_1.main()
-#   if svx_list_one_measurement is not np.inf :
-#     svx_list.append(svx_list_one_measurement)
-#     fidelity_list.append(np.abs(fidelity_list_one_measurement))
-
-# y = np.mean(np.array(svx_list),axis = 0)
-# std = np.std(np.array(svx_list),axis = 0)
-# fidelity_mean = np.mean((fidelity_list), axis = 0)
-# fidelity_std = np.std(np.array(fidelity_list),axis = 0)
-
-
-# print("Mean fidelity:", fidelity_mean , "\tStd fidelity:", fidelity_std)
-# print("Mean svx for protocol:", y,"\tStd s_cvx for protocol:", std)
-# print()
-# pl_fid_s_cvx(x,y,std,fidelity_mean,fidelity_std)
-convert_dictlist_to_matrix = lambda matrix_str: np.array([[complex(cell) for cell in row] for row in matrix_str])
-
-# np.random.seed(52)
-# import numpy as np
-# from collections import defaultdict
-# from plot_json import convert_dictlist_to_matrix
-# from purification_state import*
-# convert_dictlist_to_matrix = lambda matrix_str: np.array([[complex(cell) for cell in row] for row in matrix_str])
-# # открывыю из файла который восстанавливался для матриц с данным рангом
-# with open("dicts_matrix\\fix_matrix_r_notfix_z_with_x_min_max_r_3.json", "r") as json_file:
-#     data = []
-#     # Чтение файла построчно
-#     for line in json_file:
-#         if line.strip():  # Пропуск пустых строк
-#             data.append(json.loads(line))  # Парсим каждый объект JSON
-# # Группировка данных по строковому представлению матрицы
-# grouped_data_r = defaultdict(list)
-# for entry in data:
-#     # Преобразуем матрицу в строку для сравнения
-#     density_matrix_str = str(entry["density_matrix"])
-#     grouped_data_r[density_matrix_str].append(entry)
-# data_s = data
-
-# tomography_1 = ACT(oper_fedorov_basis, 1, 3)
-# m = [3,7,11,15,19,23,27,31,35,39]
-# m = 35
-# matrix_str = convert_dictlist_to_matrix(data[m]["density_matrix"])
-# matrix_complex = np.array([[complex(cell) for cell in row] for row in matrix_str])
-
-
-# tomography_1 = ACT(oper_fedorov_basis, 1, 3)
-# x = np.array([1, 2, 3])
-# svx_list = []         
-# fidelity_list = []
-# N = 10
-
-
-
-# for i in tqdm(range(N)):
-#   svx_list_one_measurement, fidelity_list_one_measurement, fidelity_x_min, fidelity_x_max, x_min, x_max, state_ml =\
-#       tomography_1.main(random_r=matrix_complex, epsilon = 10**-9, type_solve_semidefinite_program=cp.MOSEK, max_iters_in_semidefinite_program= 10**9)
-#   if svx_list_one_measurement is not np.inf :
-#     svx_list.append(svx_list_one_measurement)
-#     fidelity_list.append(np.abs(fidelity_list_one_measurement))
-
-
-# print(np.round(svx_list,10))
-
-# import os
-
-# # Проверка переменной окружения
-# license_file_env = os.getenv("MOSEKLM_LICENSE_FILE", "Переменная не установлена")
-# print("Путь из переменной MOSEKLM_LICENSE_FILE:", license_file_env)
