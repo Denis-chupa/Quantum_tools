@@ -88,7 +88,7 @@ class ACT:
               v.append(np.real(np.trace(i @ self.random_r)))
 
           if type_ml == "default":
-            r0 = ml.psevdoin(np.array(v)[:, np.newaxis], rank = self.n) #Нахождение матрицы плотности с помощью псевдоинверсии
+            r0 = ml.psevdoin(np.array(v)[:, np.newaxis], rank = self.r) #Нахождение матрицы плотности с помощью псевдоинверсии
             # R = self.ml(v,start_protocol,r0,v)                                    #Полученная матрицы с помощью метода простых итераций
             R = ml.result(r0, v, [100, 100, 100], epsilon=10**-11)       
             R_list[k] = [[str(item) for item in row] for row in R.tolist()]
