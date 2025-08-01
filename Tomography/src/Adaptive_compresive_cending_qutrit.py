@@ -9,6 +9,7 @@ from scipy.optimize import fsolve
 from scipy.optimize import least_squares, Bounds
 from tqdm import tqdm
 import json
+from Tomography_qutrit import*
 
 
 class ACT:

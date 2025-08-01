@@ -196,7 +196,8 @@ class tomography_pol_qutrit:
             if k[j] == 0:
               A = A
             else:
-              A += (k[j] / trace(P[j] @ self.density(Psi0))) * P[j]
+              if k[j] / trace(P[j] @ self.density(Psi0)) != 0:
+               A += (k[j] / trace(P[j] @ self.density(Psi0))) * P[j]
 
           Psi1 = (1 - alpha) * ((linalg.inv(Q)) @ A @ Psi0) + alpha * Psi0
           if abs(linalg.norm(Psi0) - linalg.norm(Psi1)) < epsilon:
