@@ -208,7 +208,8 @@ class tomography_pol_qutrit:
             if k[j] == 0:
               A = A
             else:
-              A += (k[j] / trace(self.projectors[j] @ self.density(Psi0))) * self.projectors[j]
+              if trace(self.projectors[j] @ self.density(Psi0)) != 0:
+                A += (k[j] / trace(self.projectors[j] @ self.density(Psi0))) * self.projectors[j]
 
           Psi1 = (1 - alpha) * ((linalg.inv(Q)) @ A @ Psi0) + alpha * Psi0
           if abs(linalg.norm(Psi0) - linalg.norm(Psi1)) < epsilon:

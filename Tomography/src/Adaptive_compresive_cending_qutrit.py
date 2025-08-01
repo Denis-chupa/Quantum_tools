@@ -9,7 +9,7 @@ from scipy.optimize import fsolve
 from scipy.optimize import least_squares, Bounds
 from tqdm import tqdm
 import json
-
+from Tomography_qutrit import tomography_pol_qutrit
 
 class ACT:
     def __init__(self, protocol : list, r : int, n : int):
@@ -26,11 +26,12 @@ class ACT:
       self.r = r                  
       self.n = n                  
       self.protocol = protocol    
-      
-      self.A01 = np.array([[1,0,0],[0,0,0],[0,0,0]])
-      self.A02 = np.array([[0,0,0],[0,1,0],[0,0,0]])
-      self.A03 = np.array([[0,0,0],[0,0,0],[0,0,1]])
-      self.A00 = [A01, A02, A03]
+      self.len_protocol = len(self.protocol)
+
+      # self.A01 = np.array([[1,0,0],[0,0,0],[0,0,0]])
+      # self.A02 = np.array([[0,0,0],[0,1,0],[0,0,0]])
+      # self.A03 = np.array([[0,0,0],[0,0,0],[0,0,1]])
+      # self.A00 = [A01, A02, A03]
       
 
     # Calculation of fidelity according to Ulman
@@ -64,43 +65,45 @@ class ACT:
           self.solve_semidef = cp.SCS
         else:
           self.solve_semidef = type_solve_semidefinite_program
-           
-        len_protocol = len(self.protocol)
+          
+
         v = []
         k = 0
         svx = 1
-        svx_list = [0]*len_protocol
-        x_min_list = [0]*len_protocol
-        x_max_list = [0]*len_protocol
-        R_list = [0]*len_protocol
-        fidelity_list = [0]*len_protocol
-        fidelity_x_max_list = [0]*len_protocol
-        fidelity_x_min_list = [0]*len_protocol
-        start_protocol = []
+        svx_list = [0] * self.len_protocol
+        x_min_list = [0] * self.len_protocol
+        x_max_list = [0] * self.len_protocol
+        R_list = [0] * self.len_protocol
+        fidelity_list = [0] * self.len_protocol
+        fidelity_x_max_list = [0] * self.len_protocol
+        fidelity_x_min_list = [0] * self.len_protocol
+        projectors = []
         
-        while k < len_protocol:
-          
-          start_protocol = np.array(list(start_protocol)+list(self.protocol[k]))
-          for i in start_protocol[3*k:]:
-              v.append(np.trace(i @ self.random_r))
+        while k <  self.len_protocol:
 
-          self.B = self.matrix_B(start_protocol,k)
+          ml = tomography_pol_qutrit(self.protocol[ : (k + 1)])
+
+          projectors = projectors + list([ml.projectors[k], ml.projectors[(ml.len_protocol) + k], ml.projectors[2 * (ml.len_protocol) + k]])
+          for i in projectors[3 * k :]:
+              v.append(np.real(np.trace(i @ self.random_r)))
+          
           if type_ml == "default":
-            r0 = (self.psevdoin(np.array(v)[:, np.newaxis], self.B , rank = self.r)) #Нахождение матрицы плотности с помощью псевдоинверсии
-            R = self.ml(v,start_protocol,r0,v)                                    #Полученная матрицы с помощью метода простых итераций
+            r0 = ml.psevdoin(np.array(v)[:, np.newaxis], rank = self.n) #Нахождение матрицы плотности с помощью псевдоинверсии
+            # R = self.ml(v,start_protocol,r0,v)                                    #Полученная матрицы с помощью метода простых итераций
+            R = ml.result(r0, v, [100, 100, 100], epsilon=10**-11)       
             R_list[k] = [[str(item) for item in row] for row in R.tolist()]
             fidelity_list[k] = self.Fidelity(R, self.random_r)
             probability = []
-            for i in range(len(start_protocol)):
-                  probability.append(np.trace(start_protocol[i] @ R))
+            for i in range(len(projectors)):
+                  probability.append(np.trace(projectors[i] @ R))
           elif type_ml == "without_ml":
             probability = v
           
-          self.f_max_0, x_max =  self.semidefinite_program(self.protocol[0], probability[:3], "maximize") # задаю max(f) на нулевом шаге, f = tr{XZ}
-          self.f_min_0, x_min =  self.semidefinite_program(self.protocol[0], probability[:3], "minimize") # задаю min(f) на нулевом шаге, f = tr{XZ}
+          self.f_max_0, x_max =  self.semidefinite_program(list([ml.projectors[0], ml.projectors[ml.len_protocol], ml.projectors[2 * ml.len_protocol]]), probability[:3], "maximize") # задаю max(f) на нулевом шаге, f = tr{XZ}
+          self.f_min_0, x_min =  self.semidefinite_program(list([ml.projectors[0], ml.projectors[ml.len_protocol], ml.projectors[2 * ml.len_protocol]]), probability[:3], "minimize") # задаю min(f) на нулевом шаге, f = tr{XZ}
           
-          semi_max, x_max = self.semidefinite_program(start_protocol, probability, "maximize")
-          semi_min, x_min = self.semidefinite_program(start_protocol, probability, "minimize")
+          semi_max, x_max = self.semidefinite_program(projectors, probability, "maximize")
+          semi_min, x_min = self.semidefinite_program(projectors, probability, "minimize")
           svx = (semi_max - semi_min)/(self.f_max_0-self.f_min_0)
 
           
@@ -113,6 +116,7 @@ class ACT:
              return svx_list, fidelity_list
           svx_list[k] = svx
           k+=1
+
         return svx_list, fidelity_list, fidelity_x_min_list, fidelity_x_max_list, x_min_list, x_max_list, R_list
     
     def r_rank_r(self, r: int, n: int, type: str = "default"):
@@ -140,10 +144,10 @@ class ACT:
       """
       Creating a measurement matrix (the measurement projectors are stretched out in the rows)
       """
-      B = 1j*np.ones((3*(l+1),9))
+      B = 1j*np.ones((3 * (l + 1), 9))
       k = 0
       for i in range(3):
-        for j in range(l+1):
+        for j in range(l + 1):
           B[k] = np.array((np.conj(protocol[j]).T @ self.A00[i] @ protocol[j]).flatten())
           k+=1
       return B
@@ -211,86 +215,87 @@ class ACT:
         else:
           print("Unknown solver")
           return 0
+        
         return prob.value, X.value
     
-    def psevdoin(self, p, B, rank: int):
-      """ Нахождение нулевого приближения методом псевдоинверсии """
-      R = np.linalg.pinv(B) @ p
-      R = np.array([[R[0][0], R[3][0], R[6][0]],[R[1][0], R[4][0], R[7][0]],[R[2][0], R[5][0], R[8][0]]])
+    # def psevdoin(self, p, B, rank: int):
+    #   """ Нахождение нулевого приближения методом псевдоинверсии """
+    #   R = np.linalg.pinv(B) @ p
+    #   R = np.array([[R[0][0], R[3][0], R[6][0]],[R[1][0], R[4][0], R[7][0]],[R[2][0], R[5][0], R[8][0]]])
 
-      s, w, v = np.linalg.svd(B)
-      D1, V1 = np.linalg.eigh(R)
-      N = len(D1)
-      for j in range(N):
-            if D1[j]<0:
-              D1[j]=0
-      D1=sorted(D1, reverse = True)
-      D1=D1/np.linalg.norm(D1)
-      matrix = np.zeros((N,N))
-      for j in range(N):
-        for i in range(N):
-          if (i==j):
-            if D1[i]<0:
-              matrix[i][j]=0
-            else:
-              matrix[i][j]=D1[i]
-      D1 = matrix
-      #  Расчёт V1
-      V11=V1[:,0]
-      V12=V1[:,1]
-      V13=V1[:,2]
-      #  V0 = np.array([[0],[0],[0]])
-      V1 = np.column_stack([V13, V12, V11])
-      R = V1.dot(D1)
-      PSI = self.psi(R)
-      PSI = PSI[:,: rank]
-      R = self.density(PSI)
-      R = R/np.trace(R)
-      return(R)
+    #   s, w, v = np.linalg.svd(B)
+    #   D1, V1 = np.linalg.eigh(R)
+    #   N = len(D1)
+    #   for j in range(N):
+    #         if D1[j]<0:
+    #           D1[j]=0
+    #   D1=sorted(D1, reverse = True)
+    #   D1=D1/np.linalg.norm(D1)
+    #   matrix = np.zeros((N,N))
+    #   for j in range(N):
+    #     for i in range(N):
+    #       if (i==j):
+    #         if D1[i]<0:
+    #           matrix[i][j]=0
+    #         else:
+    #           matrix[i][j]=D1[i]
+    #   D1 = matrix
+    #   #  Расчёт V1
+    #   V11=V1[:,0]
+    #   V12=V1[:,1]
+    #   V13=V1[:,2]
+    #   #  V0 = np.array([[0],[0],[0]])
+    #   V1 = np.column_stack([V13, V12, V11])
+    #   R = V1.dot(D1)
+    #   PSI = self.psi(R)
+    #   PSI = PSI[:,: rank]
+    #   R = self.density(PSI)
+    #   R = R/np.trace(R)
+    #   return(R)
     
-    def ml(self, p, P, r0, k: list = [0,0], epsilon = 1.0e-11, sigma: list = [], max: int = 10000, alpha=0.5):
-        """
-        Maximum-liklehood 
-        """
-        N=len(p)
-        sigma = np.full(N,1)
-        # if (sigma==np.full(N,0)):
-        #   sigma=np.full(N,7000)
-        # if (k==np.full(N,0)).all():
-        #   k=sigma*p
-        #Создание матрицы Q
-        Q=0
-        i=0
-        # print(sigma)
-        for j in range(N):
-          # print(P[j])
-          Q=Q+(sigma[j])*P[j]
-        #Метод простых итераций
-        Psi0 = self.psi(r0)
-        # Psi0 = np.array([[Psi0[0]],[Psi0[1]],[Psi0[2]]])
-        for i in range (0,max):
-        #Создание матрицы А
-          A=0
+    # def ml(self, p, P, r0, k: list = [0,0], epsilon = 1.0e-11, sigma: list = [], max: int = 10000, alpha=0.5):
+    #     """
+    #     Maximum-liklehood 
+    #     """
+    #     N=len(p)
+    #     sigma = np.full(N,1)
+    #     # if (sigma==np.full(N,0)):
+    #     #   sigma=np.full(N,7000)
+    #     # if (k==np.full(N,0)).all():
+    #     #   k=sigma*p
+    #     #Создание матрицы Q
+    #     Q=0
+    #     i=0
+    #     # print(sigma)
+    #     for j in range(N):
+    #       # print(P[j])
+    #       Q=Q+(sigma[j])*P[j]
+    #     #Метод простых итераций
+    #     Psi0 = self.psi(r0)
+    #     # Psi0 = np.array([[Psi0[0]],[Psi0[1]],[Psi0[2]]])
+    #     for i in range (0,max):
+    #     #Создание матрицы А
+    #       A=0
 
-          for j in range(0,N):
-            if k[j]==0:
-              A=A
-            else:
-              if np.trace(P[j] @ self.density(Psi0)) != 0:
-                A=A+(k[j]/np.trace(P[j] @ self.density(Psi0)))*P[j]
+    #       for j in range(0,N):
+    #         if k[j]==0:
+    #           A=A
+    #         else:
+    #           if np.trace(P[j] @ self.density(Psi0)) != 0:
+    #             A=A+(k[j]/np.trace(P[j] @ self.density(Psi0)))*P[j]
 
-          Psi1=(1-alpha)*((np.linalg.inv(Q))@ A @ Psi0)+alpha*Psi0
-          if abs(np.linalg.norm(Psi0)-np.linalg.norm(Psi1))<epsilon:
-            break
-          # i+=1
-          # self.fidelity_midle.append(abs(self.Fidelity(self.density(Psi0)/np.trace(self.density(Psi0)),self.start_density)))
-          # Psi1 = self.norm_sum_squares(Psi1)
-          Psi0 = Psi1
+    #       Psi1=(1-alpha)*((np.linalg.inv(Q))@ A @ Psi0)+alpha*Psi0
+    #       if abs(np.linalg.norm(Psi0)-np.linalg.norm(Psi1))<epsilon:
+    #         break
+    #       # i+=1
+    #       # self.fidelity_midle.append(abs(self.Fidelity(self.density(Psi0)/np.trace(self.density(Psi0)),self.start_density)))
+    #       # Psi1 = self.norm_sum_squares(Psi1)
+    #       Psi0 = Psi1
          
-        Rx = self.density(Psi0)
+    #     Rx = self.density(Psi0)
 
-        Rx = Rx/np.trace(Rx)
-        return (Rx)
+    #     Rx = Rx/np.trace(Rx)
+    #     return (Rx)
 
 def save_json_fix_z():
   for epoch in range(10):
