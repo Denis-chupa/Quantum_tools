@@ -10,7 +10,7 @@ from scipy.optimize import least_squares, Bounds
 from tqdm import tqdm
 import json
 from Tomography_qutrit import*
-
+import time
 
 class ACT:
     def __init__(self, protocol : list, r : int, n : int):
@@ -27,6 +27,7 @@ class ACT:
       self.r = r                  
       self.n = n                  
       self.protocol = protocol    
+      self.len_protocol = len(protocol)
       
       self.A01 = np.array([[1,0,0],[0,0,0],[0,0,0]])
       self.A02 = np.array([[0,0,0],[0,1,0],[0,0,0]])
@@ -66,22 +67,26 @@ class ACT:
         else:
           self.solve_semidef = type_solve_semidefinite_program
            
-        len_protocol = len(self.protocol)
         v = []
         k = 0
         svx = 1
-        svx_list = [0]*len_protocol
-        x_min_list = [0]*len_protocol
-        x_max_list = [0]*len_protocol
-        R_list = [0]*len_protocol
-        fidelity_list = [0]*len_protocol
-        fidelity_x_max_list = [0]*len_protocol
-        fidelity_x_min_list = [0]*len_protocol
+        svx_list = [0] * self.len_protocol
+        x_min_list = [0] * self.len_protocol
+        x_max_list = [0] * self.len_protocol
+        R_list = [0] * self.len_protocol
+        fidelity_list = [0] * self.len_protocol
+        fidelity_x_max_list = [0] * self.len_protocol
+        fidelity_x_min_list = [0] * self.len_protocol
         start_protocol = []
         
-        while k < len_protocol:
+        while k < self.len_protocol:
           
-          start_protocol = np.array(list(start_protocol)+list(self.protocol[k]))
+          proj = [0] * 3
+          for i in range(3):
+            proj[i] = np.array((np.conj(self.protocol[k]).T @ self.A00[i] @ self.protocol[k]))
+
+               
+          start_protocol = np.array(list(start_protocol)+proj)
           for i in start_protocol[3*k:]:
               v.append(np.trace(i @ self.random_r))
 
@@ -97,13 +102,17 @@ class ACT:
           elif type_ml == "without_ml":
             probability = v
           
-          self.f_max_0, x_max =  self.semidefinite_program(self.protocol[0], probability[:3], "maximize") # задаю max(f) на нулевом шаге, f = tr{XZ}
-          self.f_min_0, x_min =  self.semidefinite_program(self.protocol[0], probability[:3], "minimize") # задаю min(f) на нулевом шаге, f = tr{XZ}
+          # start = time.time() 
+
+          self.f_max_0, x_max =  self.semidefinite_program(start_protocol[:3], probability[:3], "maximize") # задаю max(f) на нулевом шаге, f = tr{XZ}
+          self.f_min_0, x_min =  self.semidefinite_program(start_protocol[:3], probability[:3], "minimize") # задаю min(f) на нулевом шаге, f = tr{XZ}
           
           semi_max, x_max = self.semidefinite_program(start_protocol, probability, "maximize")
           semi_min, x_min = self.semidefinite_program(start_protocol, probability, "minimize")
           svx = (semi_max - semi_min)/(self.f_max_0-self.f_min_0)
 
+          # end = time.time()
+          # print(f"Время выполнения: {end - start:.6f} секунд") 
           
           x_min_list[k] = [[str(item) for item in row] for row in x_min.tolist()]
           x_max_list[k] = [[str(item) for item in row] for row in x_max.tolist()]
