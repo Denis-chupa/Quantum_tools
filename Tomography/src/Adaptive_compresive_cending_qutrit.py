@@ -99,22 +99,10 @@ class ACT:
             prob_my_class[k + 1 + i] = v[3 * i + 1]
             prob_my_class[2 * (k + 1) + i] = v[3 * i + 2]
 
-          self.B = self.matrix_B(start_protocol, k)
           if type_ml == "default":
-            # r0 = (self.psevdoin(np.array(v)[:, np.newaxis], self.B , rank = self.r)) #Нахождение матрицы плотности с помощью псевдоинверсии
-            # start = time.time() 
-            
-            r0_1 = my_class_ml.psevdoin(np.array(prob_my_class)[:, np.newaxis], rank = self.r)
-            # print((np.around(self.B, 5) == np.around(my_class_ml.B, 5)).all())
-            # print(my_class_ml.B.shape, self.B.shape)
-            # if k == 0:
-              # print(np.around(self.B, 5), np.around(my_class_ml.B, 5))
-            #   print(np.around(v, 5), np.around(prob_my_class, 5))
-              # print((np.around(r0, 5) == np.around(r0_1, 5)).all())
-            #   print((np.around(r0, 5), np.around(r0_1, 5)))
-            # end = time.time()
-            # print(f"Время выполнения: {end - start:.6f} секунд") 
-            R = self.ml(v, start_protocol, r0_1, v)                                    #Полученная матрицы с помощью метода простых итераций
+
+            r0 = my_class_ml.psevdoin(np.array(prob_my_class)[:, np.newaxis], rank = self.r)    #Нахождение матрицы плотности с помощью псевдоинверсии
+            R = my_class_ml.result(r0, prob_my_class, [1, 1, 1], epsilon=10**-11)               #Полученная матрицы с помощью метода простых итераций
             R_list[k] = [[str(item) for item in row] for row in R.tolist()]
             fidelity_list[k] = self.Fidelity(R, self.random_r)
             probability = []
@@ -163,19 +151,6 @@ class ACT:
           Q = real_part + 1j * imaginary_part
     
        return (np.conj(Q.T) @ Q) / np.trace(np.conj(Q.T) @ Q)
-    
-    def matrix_B(self, protocol, l):
-      """
-      Creating a measurement matrix (the measurement projectors are stretched out in the rows)
-      """
-      B = 1j*np.ones((3*(l+1),9))
-      k = 0
-      for i in range(3):
-        for j in range(l+1):
-          # B[k] = np.array((np.conj(protocol[j]).T @ self.A00[i] @ protocol[j]).flatten())
-          B[k] = np.array(protocol[k].flatten())
-          k+=1
-      return B
     
     def psi(self, r: int):
       """  
@@ -242,85 +217,6 @@ class ACT:
           return 0
         return prob.value, X.value
     
-    def psevdoin(self, p, B, rank: int):
-      """ Нахождение нулевого приближения методом псевдоинверсии """
-      R = np.linalg.pinv(B) @ p
-      R = np.array([[R[0][0], R[3][0], R[6][0]],[R[1][0], R[4][0], R[7][0]],[R[2][0], R[5][0], R[8][0]]])
-
-      s, w, v = np.linalg.svd(B)
-      D1, V1 = np.linalg.eigh(R)
-      N = len(D1)
-      for j in range(N):
-            if D1[j]<0:
-              D1[j]=0
-      D1=sorted(D1, reverse = True)
-      D1=D1/np.linalg.norm(D1)
-      matrix = np.zeros((N,N))
-      for j in range(N):
-        for i in range(N):
-          if (i==j):
-            if D1[i]<0:
-              matrix[i][j]=0
-            else:
-              matrix[i][j]=D1[i]
-      D1 = matrix
-      #  Расчёт V1
-      V11=V1[:,0]
-      V12=V1[:,1]
-      V13=V1[:,2]
-      #  V0 = np.array([[0],[0],[0]])
-      V1 = np.column_stack([V13, V12, V11])
-      R = V1.dot(D1)
-      PSI = self.psi(R)
-      PSI = PSI[:, :rank]
-      R = self.density(PSI)
-      R = R/np.trace(R)
-      return(R)
-    
-    def ml(self, p, P, r0, k: list = [0,0], epsilon = 1.0e-11, sigma: list = [], max: int = 10000, alpha=0.5):
-        """
-        Maximum-liklehood 
-        """
-        N=len(p)
-        sigma = np.full(N,1)
-        # if (sigma==np.full(N,0)):
-        #   sigma=np.full(N,7000)
-        # if (k==np.full(N,0)).all():
-        #   k=sigma*p
-        #Создание матрицы Q
-        Q=0
-        i=0
-        # print(sigma)
-        for j in range(N):
-          # print(P[j])
-          Q=Q+(sigma[j])*P[j]
-        #Метод простых итераций
-        Psi0 = self.psi(r0)
-        # Psi0 = np.array([[Psi0[0]],[Psi0[1]],[Psi0[2]]])
-        for i in range (0,max):
-        #Создание матрицы А
-          A=0
-
-          for j in range(0,N):
-            if k[j]==0:
-              A=A
-            else:
-              if np.trace(P[j] @ self.density(Psi0)) != 0:
-                A=A+(k[j]/np.trace(P[j] @ self.density(Psi0)))*P[j]
-
-          Psi1=(1-alpha)*((np.linalg.inv(Q))@ A @ Psi0)+alpha*Psi0
-          if abs(np.linalg.norm(Psi0)-np.linalg.norm(Psi1))<epsilon:
-            break
-          # i+=1
-          # self.fidelity_midle.append(abs(self.Fidelity(self.density(Psi0)/np.trace(self.density(Psi0)),self.start_density)))
-          # Psi1 = self.norm_sum_squares(Psi1)
-          Psi0 = Psi1
-         
-        Rx = self.density(Psi0)
-
-        Rx = Rx/np.trace(Rx)
-        return (Rx)
-
 def save_json_fix_z():
   for epoch in range(10):
     type_protocola = "fedorov"  # может быть "fedorov" или "one_plate" в зависимости от протокола
