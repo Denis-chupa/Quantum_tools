@@ -86,7 +86,7 @@ class ACT:
           projectors = projectors + list([ml.projectors[k], ml.projectors[(ml.len_protocol) + k], ml.projectors[2 * (ml.len_protocol) + k]])
           for i in projectors[3 * k :]:
               v.append(np.real(np.trace(i @ self.random_r)))
-          
+
           if type_ml == "default":
             r0 = ml.psevdoin(np.array(v)[:, np.newaxis], rank = self.n) #Нахождение матрицы плотности с помощью псевдоинверсии
             # R = self.ml(v,start_protocol,r0,v)                                    #Полученная матрицы с помощью метода простых итераций
@@ -99,13 +99,14 @@ class ACT:
           elif type_ml == "without_ml":
             probability = v
           
-          self.f_max_0, x_max =  self.semidefinite_program(list([ml.projectors[0], ml.projectors[ml.len_protocol], ml.projectors[2 * ml.len_protocol]]), probability[:3], "maximize") # задаю max(f) на нулевом шаге, f = tr{XZ}
-          self.f_min_0, x_min =  self.semidefinite_program(list([ml.projectors[0], ml.projectors[ml.len_protocol], ml.projectors[2 * ml.len_protocol]]), probability[:3], "minimize") # задаю min(f) на нулевом шаге, f = tr{XZ}
+          self.f_max_0, x_max =  self.semidefinite_program(projectors[:3], probability[:3], "maximize") # задаю max(f) на нулевом шаге, f = tr{XZ}
+          self.f_min_0, x_min =  self.semidefinite_program(projectors[:3], probability[:3], "minimize") # задаю min(f) на нулевом шаге, f = tr{XZ}
           
           semi_max, x_max = self.semidefinite_program(projectors, probability, "maximize")
           semi_min, x_min = self.semidefinite_program(projectors, probability, "minimize")
           svx = (semi_max - semi_min)/(self.f_max_0-self.f_min_0)
 
+          # print(self.f_max_0, self.f_min_0)
           
           x_min_list[k] = [[str(item) for item in row] for row in x_min.tolist()]
           x_max_list[k] = [[str(item) for item in row] for row in x_max.tolist()]
