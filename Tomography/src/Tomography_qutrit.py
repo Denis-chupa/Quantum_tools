@@ -1,4 +1,4 @@
-from numpy import array, linalg, ones, conj, trace, zeros, column_stack, full, hstack, cos, sin, pi
+from numpy import array, linalg, ones, conj, trace, zeros, column_stack, full, hstack, cos, sin, pi, diag
 from scipy.linalg import sqrtm
 
 
@@ -53,16 +53,15 @@ def Gl_8(Q):
   return M
 
 class tomography_pol_qutrit:
-  def __init__(self, protokol_angles : list):
+  def __init__(self, protokol_angles: list):
 
-    self.epsilon=1.0e-11
     self.angles = protokol_angles
-    self.A01 = array([[1,0,0],[0,0,0],[0,0,0]])
-    self.A02 = array([[0,0,0],[0,1,0],[0,0,0]])
-    self.A03 = array([[0,0,0],[0,0,0],[0,0,1]])
-    self.A00 = [self.A01, self.A02, self.A03]
-    self.A = tomography_pol_qutrit.matrix_A(self)
+    self.len_protocol = len(self.angles)
+    self.A00 = [diag([1,0,0]), diag([0,1,0]), diag([0,0,1])]
+    self.projectors = tomography_pol_qutrit.matrix_P(self)
     self.B = tomography_pol_qutrit.matrix_B(self)
+    
+    # отдельные состояние которые удобно использовать
     self.hh = array([[1], [0], [0]])
     self.hv = array([[0], [1], [0]])
     self.vv = array([[0], [0], [1]])
@@ -71,8 +70,15 @@ class tomography_pol_qutrit:
     self.dd = array([[1 / 2], [1 / (2)**0.5], [1 / 2]])
     self.ll = array([[1 / 2], [-1j / (2)**0.5], [-1 / 2]])
 
-  # Превращение матрицы плотности в матрицу состояния кутрита
+  
   def psi(self, r):
+    """
+    Превращение матрицы плотности в матрицу состояния кутрита.
+    Args:
+      r: матрица плотности.
+    Return:
+      Полученный вектор состояния.
+    """
     S, V, D = linalg.svd(r, full_matrices = True, compute_uv = True)
     N = len(V)
     K = (ones((N, N)) + V - ones((N, N)))
@@ -83,74 +89,72 @@ class tomography_pol_qutrit:
     psi = S @ K**0.5  # убедиться что праильный корень
     return psi
 
-  # Превращение матрицы состояния кутрита в матрицу плотности
   def density(self, psi):
+    """
+      Превращение матрицы состояния кутрита в матрицу плотности ρ = |ψ><ψ|.
+    Args:
+      psi: вектор состояния ψ.
+    Return:
+      Матрица плотности ρ.
+    """
     return psi @ (conj(psi)).T
-
-  # Вспомогательные функции
-  def kh(self, k):
-      k0 = 1j * ones(len(self.angles))
-      for i in range(len(self.angles)):
-        k0[i] = k[3 * i]
-      return k0
   
-  def khv(self, k):
-      k0 = 1j * ones(len(self.angles))
-      for i in range(len(self.angles)):
-        k0[i] = k[3 * i + 1]
-      return k0
-  
-  def kv(self, k):
-      k0 = 1j * ones(len(self.angles))
-      for i in range(len(self.angles)):
-        k0[i] = k[3 * i + 2]
-      return k0
-  
-  def SUMK(self, k1, k2, k3):
-      return array(list(k1) + list(k2) + list(k3))
-  
-  def SUMK1(self, k1, k2, k3):
-      k0 = 1j * ones(3 * len(self.angles))
-      for i in range(len(self.angles)):
-        k0[3 * i : 3 * i + 1] = [k1[i], k2[i], k3[i]]
-      return k0
-  
-  def matrix_A(self):
-    A = 1j * ones((3 * len(self.angles), 3, 3))
-    k = 0
+  def matrix_P(self):
+    """
+      Создание набора проекторов измерения для заданного протокола на базисные состояния HH, VV, HV.
+    """
+    A = ones((3 * self.len_protocol, 3, 3), dtype=complex)
     for i in range(3):
-      for j in range(len(self.angles)):
-        A[k] = array(conj(self.angles[j]).T @ self.A00[i] @ self.angles[j])
-        k+=1
+      for j in range(self.len_protocol):
+        A[i * self.len_protocol + j] = array(conj(self.angles[j]).T @ self.A00[i] @ self.angles[j])
     return A
   
   def matrix_B(self):
-      B = 1j * ones((3*len(self.angles),9))
-      k = 0
-      for i in range(3):
-        for j in range(len(self.angles)):
-          B[k] = array((conj(self.angles[j]).T @ self.A00[i] @ self.angles[j]).flatten())
-          k+=1
+      """
+        Создание матрицы протокольных измерений. Где каждая строчка - это
+      проекторы измерения для заданного протокола на базисные состояния HH, VV, HV.
+      """
+      B = ones((3 * self.len_protocol, 9), dtype=complex)
+      for index, el in enumerate(self.projectors):
+          B[index] = array(el.flatten())
       return B
 
-
   def Fidelity(self, r, r_t):
+     """
+     Точность двух состояний по Ульману.
+     Args:
+        r: матрица плотности первого состояния. 
+        r_t: матрица плотности второго состояния.
+     Return:
+        Мера близости двух состояний.
+     """
      return (trace(sqrtm(sqrtm(r) @ r_t @ sqrtm(r))))**2
 
-  # Мeтод псевдоинверсии
-  def psevdoin(self, p):
+  def psevdoin(self, p, rank: int=1):
+    """
+      Выполняет метод псевдоинверсии для правила Борна p = B @ R, где p, R - столбцы вероятностей и элементов
+    матрицы плотности соответственно, B - матрица протокольных измерений. При этом B представляется через SVD разложение.
+    Args:
+      p: вектор вероятностей
+      rank(int): ранг позвращаемой матрицы плотности.
+    Return:
+      Нормированная матрица плотности с рангом rank.
+    """
     R = linalg.pinv(self.B) @ p
     R = array([[R[0][0], R[3][0], R[6][0]],[R[1][0], R[4][0], R[7][0]],[R[2][0], R[5][0], R[8][0]]])
-    # s, w, v = linalg.svd(self.B)
-    # print("sing =",abs(w))
     D1, V1 = linalg.eigh(R)
     N = len(D1)
+    
+    # зануляются отрицательные собственные значения
     for j in range(N):
           if D1[j] < 0:
             D1[j] = 0
+
     D1 = sorted(D1, reverse = True)
     D1 = D1 / linalg.norm(D1)
     matrix = zeros((N,N))
+
+    # создаётся матрица на диагонали которой собственные значения по убыванию
     for j in range(N):
       for i in range(N):
         if (i == j):
@@ -168,68 +172,84 @@ class tomography_pol_qutrit:
     V1 = column_stack([V13, V12, V11])
     R = V1.dot(D1)
     PSI = self.psi(R)
-    PSI = PSI[:, :1]
+    PSI = PSI[:, :rank]
     R = self.density(PSI)
     R = R / trace(R)
     return R
 
-  # Метод простых итерций
-  def result(self, p, P, r0, k=[0,0], epsilon = 1.0e-11, sigma=[0,0], max=1000, alpha=0.5):
-        N = len(p)
-        if (sigma == full(N,0)).all():
-          sigma = full(N,7000)
-        if (k == full(N,0)).all():
-          k = sigma * p
+  def result(self, r0, k, sigma, epsilon, max_iter=1000, alpha=0.5):
+        """
+          Решение уравнения A(psi) @ psi = Q @ psi  методом простой итерации, где
+        psi_(i+1) = (1 - a) * Q^(-1) @ A @ psi_i + a * psi_i. В нашем случае 
+        A = Σ(k_j / p_j) * P_j, Q = Σσ_j * P_j
+        Args:
+          p(list): экспериментальные вероятности измерений
+          r0: начальное приближение psi_0
+          epsilon: точность метода
+          k: частоты получаемые в эксперименте
+          sigma: экспериментальные отклонения для соотношений между HH, HV, VV
+          max_iter: максимальное количество сделанных итераций 
+          alpha: коэффициент схождения метода.
+        """
+
+        N = 3 * self.len_protocol
 
         #Создание матрицы Q
         Q=0
-        i=0
         for j in range(0,N):
-          Q=Q+(sigma[j])*P[j]
+          Q += (sigma[j//self.len_protocol]) * self.projectors[j]
 
         #Метод простых итераций
         Psi0 = self.psi(r0)
-        for i in range(max):
+        for i in range(max_iter):
         #Создание матрицы А
           A = 0
           for j in range(0, N):
             if k[j] == 0:
               A = A
             else:
-              A += (k[j] / trace(P[j] @ self.density(Psi0))) * P[j]
+              A += (k[j] / trace(self.projectors[j] @ self.density(Psi0))) * self.projectors[j]
 
           Psi1 = (1 - alpha) * ((linalg.inv(Q)) @ A @ Psi0) + alpha * Psi0
           if abs(linalg.norm(Psi0) - linalg.norm(Psi1)) < epsilon:
             break
-          
-          i += 1
+        
           Psi0 = Psi1
 
         Rx = self.density(Psi0)
-
         Rx = Rx / trace(Rx)
         return Rx
 
-  #Обработка эксперимента
-  def experiment(self, k, start_state, sigma1, sigma2, sigma3, visible = True):
-
-      sigma = hstack([sigma1,sigma2,sigma3])
+  def experiment(self, k, start_state, sigma1, sigma2, sigma3, rank: int=1,\
+                 epsilon: float=1.0e-11, max_iter: int=1000, alpha: float=0.5, visible: bool=True):
+      """
+      Восстановление матрицы плотности по экспериментальным частотам.
+      Args:
+        k(float): экспериментальные частоты.
+        start_state: идеальное состояние.
+        sigma1(float): частоты для HH.
+        sigma2(float): частоты для HV.
+        sigma3(float): частоты для VV.
+        rank(int): ранг восстанавлиемой матрицы плотности.
+        epsilon: точность метода итераций.
+        max_iter: максимальное число итераций в методе итераций.
+        alpha: параметр метода итераций.
+        visible(bool): параметр при котором показывается фиделити между идеальным и восстановленным состоянием.
+      Return:
+        Fidelity по ульману между идеальной матрицей и матрицей псевдоинверсии и между идеальной матрицей и восстановленной
+      матрицей.
+      """
 
       # предобработка
       self.start_density = self.density(start_state)
-      ph = self.kh(k) / sigma1[1]
-      phv = self.khv(k) / sigma2[1]
-      pv = self.kv(k) / sigma3[1]
-      k1 = ph * sigma1[1]
-      k2 = phv * sigma2[1]
-      k3 = pv * sigma3[1]
-      k = self.SUMK(k1, k2, k3)
-      p = self.SUMK(ph, phv, pv)
-      r0 = self.psevdoin(p.reshape(3 * len(self.angles), 1))                   #Нахождение матрицы плотности с помощью псевдоинверсии
-      Rx = self.result(p, self.A, r0, k, self.epsilon, sigma)                  #Полученная матрицы с помощью метода простых итераций
+      ph = k[::3] / sigma1
+      phv = k[1::3] / sigma2
+      pv = k[2::3] / sigma3
+      k = list(k[::3]) + list(k[1::3]) + list(k[2::3])
+      p = array(list(ph) + list(phv) + list(pv))
+      self.matrix_psevdoin = self.psevdoin(p.reshape(3 * self.len_protocol, 1), rank=rank)                               #Нахождение матрицы плотности с помощью псевдоинверсии
+      self.matrix_finish = self.result(self.matrix_psevdoin, k, [sigma1,sigma2,sigma3], epsilon, max_iter, alpha)      #Полученная матрицы с помощью метода простых итераций
 
-      self.matrix_psevdoin = r0
-      self.matrix_finish = Rx
       if visible == True:
-          print("Fidelity between start matrix density and matrix pseudoinversion =", abs(self.Fidelity(r0, self.start_density)))
-          print("Finish fidelity =", (abs(self.Fidelity(Rx, self.start_density))))
+          print("Fidelity between start matrix density and matrix pseudoinversion =", abs(self.Fidelity(self.matrix_psevdoin, self.start_density)))
+          print("Finish fidelity =", (abs(self.Fidelity(self.matrix_finish, self.start_density))))
