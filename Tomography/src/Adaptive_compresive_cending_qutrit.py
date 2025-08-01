@@ -81,6 +81,8 @@ class ACT:
         
         while k < self.len_protocol:
           
+          my_class_ml = tomography_pol_qutrit(self.protocol[ : (k + 1)])
+          
           proj = [0] * 3
           for i in range(3):
             proj[i] = np.array((np.conj(self.protocol[k]).T @ self.A00[i] @ self.protocol[k]))
@@ -90,10 +92,29 @@ class ACT:
           for i in start_protocol[3*k:]:
               v.append(np.trace(i @ self.random_r))
 
-          self.B = self.matrix_B(start_protocol,k)
+          prob_my_class = [0] * ((k + 1) * 3)
+
+          for i in range(k + 1):
+            prob_my_class[i] = v[3 * i]
+            prob_my_class[k + 1 + i] = v[3 * i + 1]
+            prob_my_class[2 * (k + 1) + i] = v[3 * i + 2]
+
+          self.B = self.matrix_B(start_protocol, k)
           if type_ml == "default":
-            r0 = (self.psevdoin(np.array(v)[:, np.newaxis], self.B , rank = self.r)) #Нахождение матрицы плотности с помощью псевдоинверсии
-            R = self.ml(v,start_protocol,r0,v)                                    #Полученная матрицы с помощью метода простых итераций
+            # r0 = (self.psevdoin(np.array(v)[:, np.newaxis], self.B , rank = self.r)) #Нахождение матрицы плотности с помощью псевдоинверсии
+            # start = time.time() 
+            
+            r0_1 = my_class_ml.psevdoin(np.array(prob_my_class)[:, np.newaxis], rank = self.r)
+            # print((np.around(self.B, 5) == np.around(my_class_ml.B, 5)).all())
+            # print(my_class_ml.B.shape, self.B.shape)
+            # if k == 0:
+              # print(np.around(self.B, 5), np.around(my_class_ml.B, 5))
+            #   print(np.around(v, 5), np.around(prob_my_class, 5))
+              # print((np.around(r0, 5) == np.around(r0_1, 5)).all())
+            #   print((np.around(r0, 5), np.around(r0_1, 5)))
+            # end = time.time()
+            # print(f"Время выполнения: {end - start:.6f} секунд") 
+            R = self.ml(v, start_protocol, r0_1, v)                                    #Полученная матрицы с помощью метода простых итераций
             R_list[k] = [[str(item) for item in row] for row in R.tolist()]
             fidelity_list[k] = self.Fidelity(R, self.random_r)
             probability = []
@@ -102,8 +123,6 @@ class ACT:
           elif type_ml == "without_ml":
             probability = v
           
-          # start = time.time() 
-
           self.f_max_0, x_max =  self.semidefinite_program(start_protocol[:3], probability[:3], "maximize") # задаю max(f) на нулевом шаге, f = tr{XZ}
           self.f_min_0, x_min =  self.semidefinite_program(start_protocol[:3], probability[:3], "minimize") # задаю min(f) на нулевом шаге, f = tr{XZ}
           
@@ -111,8 +130,7 @@ class ACT:
           semi_min, x_min = self.semidefinite_program(start_protocol, probability, "minimize")
           svx = (semi_max - semi_min)/(self.f_max_0-self.f_min_0)
 
-          # end = time.time()
-          # print(f"Время выполнения: {end - start:.6f} секунд") 
+          
           
           x_min_list[k] = [[str(item) for item in row] for row in x_min.tolist()]
           x_max_list[k] = [[str(item) for item in row] for row in x_max.tolist()]
@@ -154,7 +172,8 @@ class ACT:
       k = 0
       for i in range(3):
         for j in range(l+1):
-          B[k] = np.array((np.conj(protocol[j]).T @ self.A00[i] @ protocol[j]).flatten())
+          # B[k] = np.array((np.conj(protocol[j]).T @ self.A00[i] @ protocol[j]).flatten())
+          B[k] = np.array(protocol[k].flatten())
           k+=1
       return B
     
@@ -253,7 +272,7 @@ class ACT:
       V1 = np.column_stack([V13, V12, V11])
       R = V1.dot(D1)
       PSI = self.psi(R)
-      PSI = PSI[:,: rank]
+      PSI = PSI[:, :rank]
       R = self.density(PSI)
       R = R/np.trace(R)
       return(R)
