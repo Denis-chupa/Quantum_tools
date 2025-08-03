@@ -5,8 +5,8 @@ from Qutrit import*
 import cvxpy as cp
 import matplotlib.pyplot as plt 
 from scipy.linalg import sqrtm
-from scipy.optimize import fsolve
 from scipy.optimize import least_squares, Bounds
+from matplotlib.gridspec import GridSpec
 from tqdm import tqdm
 import json
 from Tomography_qutrit import*
@@ -272,7 +272,7 @@ def save_json_fix_z():
 
   print("Данные успешно сохранены в 'matrix_and_parameters.json'.")
 
-def pl_fid_s_cvx(x,y,std,fidelity_mean,fidelity_std):
+def pl_fid_s_cvx(x, mean_s_cvx, std, fidelity_mean, fidelity_std):
   # Создаем общую фигуру с subfigures
   fig = plt.figure(constrained_layout=True, figsize=(10, 5))
   subfigs = fig.subfigures(1, 2)  # одна строка, две колонки
@@ -280,22 +280,19 @@ def pl_fid_s_cvx(x,y,std,fidelity_mean,fidelity_std):
 
   # Первая subfigure для графика SVX
   ax1 = subfigs[0].subplots()
-  ax1.errorbar(x, y, 
+  ax1.errorbar(x, mean_s_cvx, 
              yerr=std,  # вертикальные погрешности
              fmt='o',   # стиль маркера (кружки)
              color='blue', 
              markersize=3, 
              capsize=2,  # размер "шапочки" погрешности
-             label='$S_{\mathrm{cvx}} \pm$ std')
+             label=r'$S_{\mathrm{cvx}} \pm$ std')
   # ax1.set_yscale('log')
-# Дополнительная тонкая линия, соединяющая точки (опционально)
-  ax1.plot(x, y, color='blue', alpha=0.3, linestyle='--', linewidth=1)
-  # ax1.plot(x, y, yerr=std, label='S_cvx Mean', color='blue')
-  # ax1.fill_between(x, y - std, y + std, color='lightblue', alpha=0.5, label='S_cvx Std')
+  # Дополнительная тонкая линия, соединяющая точки (опционально)
+  ax1.plot(x, mean_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
+  ax1.tick_params(axis='both', direction='in')
   ax1.set_xlabel('Количество измерений')
-  ax1.set_ylabel('$S_{\mathrm{cvx}}$')
-  # ax1.set_title('График зависимости $S_{\mathrm{cvx}}$ \n от количества измерений.')
-  # ax1.set_ylim(bottom=y[-1]/10, top=1)  
+  ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
   ax1.set_ylim(-0.1, 1.1)
   ax1.set_xlim(1, len(x)+0.2)
   ax1.grid(True)
@@ -312,23 +309,87 @@ def pl_fid_s_cvx(x,y,std,fidelity_mean,fidelity_std):
              label='Fidelity ± std')
   
   # ax2.set_yscale('log')
-# Дополнительная тонкая линия, соединяющая точки (как в исходном коде)
+  # Дополнительная тонкая линия, соединяющая точки (как в исходном коде)
   ax2.plot(x, fidelity_mean, color='green', alpha=0.3, linestyle='--', linewidth=1)
-  # ax2.plot(x, fidelity_mean, label='Fidelity Mean', color='green', marker='o')
-  # ax2.fill_between(x, fidelity_mean - fidelity_std, fidelity_mean + fidelity_std, color='lightgreen', alpha=0.5, label='Fidelity Std')
+  ax2.tick_params(axis='both', direction='in')
   ax2.set_xlabel('Количество измерений')
   ax2.set_ylabel('Fidelity')
-  # ax2.set_title('График зафисимости fidelity \n от количества измерений.')
+  ax2.set_ylim(-0.1, 1.1)
+  ax2.set_xlim(1, len(x) + 0.2)
+  ax2.grid(True)
+  ax2.legend(loc='upper left')
+  plt.show()
+
+def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_distr, title=None):
+  # Создаем общую фигуру с subfigures
+  fig = plt.figure(figsize=(15, 4))
+  gs = GridSpec(1, 5, width_ratios=[2, 0, 2, 0.1, 2])
+  
+  # subfigs = fig.subfigures(1, 3)  # одна строка, две колонки
+
+
+  if title:
+      fig.suptitle(title, fontsize=14, y=1)
+
+  # Первая subfigure для графика SVX
+  ax1 = fig.add_subplot(gs[0])
+  ax1.errorbar(x, mean_s_cvx, 
+             yerr=std,  # вертикальные погрешности
+             fmt='o',   # стиль маркера (кружки)
+             color='blue', 
+             markersize=3, 
+             capsize=2,  # размер "шапочки" погрешности
+             label=r'$S_{\mathrm{cvx}} \pm$ std')
+  # ax1.set_yscale('log')
+  # Дополнительная тонкая линия, соединяющая точки (опционально)
+  ax1.plot(x, mean_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
+  ax1.set_xlabel('Количество измерений')
+  ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
+  ax1.set_ylim(-0.1, 1.1)
+  ax1.set_xlim(1, len(x)+0.2)
+  ax1.grid(True)
+  ax1.legend()
+
+  # Вторая subfigure для графика Fidelity
+  
+  ax2 = fig.add_subplot(gs[2])
+  ax2.errorbar(x, fidelity_mean, 
+             yerr=fidelity_std,  # вертикальные погрешности
+             fmt='o',            # стиль маркера (кружки)
+             color='green', 
+             markersize=3, 
+             capsize=4,          # размер "шапочки" погрешности
+             label='Fidelity ± std')
+  
+  # ax2.set_yscale('log')
+  # Дополнительная тонкая линия, соединяющая точки (как в исходном коде)
+  ax2.plot(x, fidelity_mean, color='green', alpha=0.3, linestyle='--', linewidth=1)
+  ax2.tick_params(axis='both', direction='in')
+  ax2.set_xlabel('Количество измерений')
+  ax2.set_ylabel('Fidelity')
   ax2.set_ylim(-0.1, 1.1)
   ax2.set_xlim(1, len(x) + 0.2)
   ax2.grid(True)
   ax2.legend(loc='upper left')
 
-  # Отображаем общий заголовок
-  # fig.suptitle(name_title, fontsize=16)
+  # Дополнительная тонкая линия, соединяющая точки (опционально)
+  ax1.plot(x, mean_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
+  ax1.tick_params(axis='both', direction='in')
+  ax1.set_xlabel('Количество измерений')
+  ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
+  ax1.set_ylim(-0.1, 1.1)
+  ax1.set_xlim(1, len(x)+0.2)
+  ax1.grid(True)
+  ax1.legend()
+
+  # Третья subfigure для распределения последнего измерения
+  ax3 = fig.add_subplot(gs[4])
+  ax3.boxplot(s_cvx_distr, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+  ax3.tick_params(axis='both', direction='in')
   
-  # fig.suptitle(f'Протокол одной пластинкой λ/8', fontsize=16)
-  # fig.suptitle(f'Comparison of S_cvx and Fidelity with eps = {10**-4}', fontsize=16)
+  # ax3.set_yscale('log')
+  
+  ax3.set_xlabel('Количество измерений')
+  ax3.set_ylabel(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$')
+  # plt.tight_layout()
   plt.show()
-
-
