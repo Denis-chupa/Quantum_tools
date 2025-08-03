@@ -323,13 +323,10 @@ def pl_fid_s_cvx(x, mean_s_cvx, std, fidelity_mean, fidelity_std):
 def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_distr, title=None):
   # Создаем общую фигуру с subfigures
   fig = plt.figure(figsize=(15, 4))
-  gs = GridSpec(1, 5, width_ratios=[2, 0, 2, 0.1, 2])
+  gs = GridSpec(1, 5, width_ratios=[2, 0, 2, 0.0, 2])
   
-  # subfigs = fig.subfigures(1, 3)  # одна строка, две колонки
-
-
   if title:
-      fig.suptitle(title, fontsize=14, y=1)
+      fig.suptitle(title, fontsize=14, y=1.1)
 
   # Первая subfigure для графика SVX
   ax1 = fig.add_subplot(gs[0])
@@ -340,15 +337,15 @@ def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_di
              markersize=3, 
              capsize=2,  # размер "шапочки" погрешности
              label=r'$S_{\mathrm{cvx}} \pm$ std')
-  # ax1.set_yscale('log')
   # Дополнительная тонкая линия, соединяющая точки (опционально)
   ax1.plot(x, mean_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
+  ax1.set_title(r"График зависимости $S_{\mathrm{cvx}}$" +"\nот количества измерений")
   ax1.set_xlabel('Количество измерений')
   ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
+  ax1.set_xticks(x)
   ax1.set_ylim(-0.1, 1.1)
   ax1.set_xlim(1, len(x)+0.2)
   ax1.grid(True)
-  ax1.legend()
 
   # Вторая subfigure для графика Fidelity
   
@@ -365,22 +362,16 @@ def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_di
   # Дополнительная тонкая линия, соединяющая точки (как в исходном коде)
   ax2.plot(x, fidelity_mean, color='green', alpha=0.3, linestyle='--', linewidth=1)
   ax2.tick_params(axis='both', direction='in')
+  ax2.set_title("График зависимости Fidelity\nот количества измерений")
   ax2.set_xlabel('Количество измерений')
   ax2.set_ylabel('Fidelity')
   ax2.set_ylim(-0.1, 1.1)
   ax2.set_xlim(1, len(x) + 0.2)
+  ax2.set_xticks([1, 2, 3, 4])
   ax2.grid(True)
-  ax2.legend(loc='upper left')
+  
 
-  # Дополнительная тонкая линия, соединяющая точки (опционально)
-  ax1.plot(x, mean_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
-  ax1.tick_params(axis='both', direction='in')
-  ax1.set_xlabel('Количество измерений')
-  ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
-  ax1.set_ylim(-0.1, 1.1)
-  ax1.set_xlim(1, len(x)+0.2)
-  ax1.grid(True)
-  ax1.legend()
+
 
   # Третья subfigure для распределения последнего измерения
   ax3 = fig.add_subplot(gs[4])
@@ -390,6 +381,7 @@ def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_di
   # ax3.set_yscale('log')
   
   ax3.set_xlabel('Количество измерений')
-  ax3.set_ylabel(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$')
-  # plt.tight_layout()
+  ax3.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$')
+  ax3.set_ylabel(r'$S_{\mathrm{cvx}}$') 
+  ax3.set_xticks([])
   plt.show()
