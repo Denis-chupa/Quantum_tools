@@ -344,7 +344,7 @@ def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_di
   ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
   ax1.set_xticks(x)
   ax1.set_ylim(-0.1, 1.1)
-  ax1.set_xlim(1, len(x)+0.2)
+  ax1.set_xlim(0.8, len(x)+0.2)
   ax1.grid(True)
 
   # Вторая subfigure для графика Fidelity
@@ -366,8 +366,8 @@ def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_di
   ax2.set_xlabel('Количество измерений')
   ax2.set_ylabel('Fidelity')
   ax2.set_ylim(-0.1, 1.1)
-  ax2.set_xlim(1, len(x) + 0.2)
-  ax2.set_xticks([1, 2, 3, 4])
+  ax2.set_xticks(x)
+  ax2.set_xlim(0.8, len(x) + 0.2)
   ax2.grid(True)
   
 
