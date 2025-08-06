@@ -381,3 +381,53 @@ def pl_fid_s_cvx_distr(x, mean_s_cvx, fidelity_mean, s_cvx_distr, title=None):
   ax3.set_ylabel(r'$S_{\mathrm{cvx}}$') 
   ax3.set_xticks([])
   plt.show()
+
+
+def pl_fid_max_min(x, fidelity_mean_1, fidelity_mean_2, title=None):
+  """
+  Для сравнения изначальной матрицы с максимальной и минимальной матрицей
+  """
+  # Создаем общую фигуру с subfigures
+  fig = plt.figure(figsize=(15, 4))
+  gs = GridSpec(1, 3, width_ratios=[2, 0, 2])
+  
+  if title:
+      fig.suptitle(title, fontsize=14, y=1.1)
+
+  # Первая subfigure для графика SVX
+  ax1 = fig.add_subplot(gs[0])
+  ax1.errorbar(x, fidelity_mean_1,
+             fmt='o',   # стиль маркера (кружки)
+             color='blue', 
+             markersize=3)
+  
+  # Дополнительная тонкая линия, соединяющая точки (опционально)
+  ax1.plot(x, fidelity_mean_1, color='blue', alpha=0.3, linestyle='--', linewidth=1)
+  ax1.tick_params(axis='both', direction='in')
+  ax1.set_title(r"График зависимости $S_{\mathrm{cvx}}$" +"\nот количества измерений")
+  ax1.set_xlabel('Количество измерений')
+  ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
+  ax1.set_xticks(x)
+  ax1.set_ylim(-0.1, 1.1)
+  ax1.set_xlim(0.8, len(x)+0.2)
+  ax1.grid(True)
+
+  # Вторая subfigure для графика Fidelity
+  
+  ax2 = fig.add_subplot(gs[2])
+  ax2.errorbar(x, fidelity_mean_2, 
+             fmt='o',            # стиль маркера (кружки)
+             color='green', 
+             markersize=3)
+  
+  # ax2.set_yscale('log')
+  # Дополнительная тонкая линия, соединяющая точки (как в исходном коде)
+  ax2.plot(x, fidelity_mean_2, color='green', alpha=0.3, linestyle='--', linewidth=1)
+  ax2.tick_params(axis='both', direction='in')
+  ax2.set_title("График зависимости Fidelity\nот количества измерений")
+  ax2.set_xlabel('Количество измерений')
+  ax2.set_ylabel('Fidelity')
+  ax2.set_ylim(-0.1, 1.1)
+  ax2.set_xticks(x)
+  ax2.set_xlim(0.8, len(x) + 0.2)
+  ax2.grid(True)
