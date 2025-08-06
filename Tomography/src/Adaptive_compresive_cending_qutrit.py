@@ -320,7 +320,7 @@ def pl_fid_s_cvx(x, mean_s_cvx, std, fidelity_mean, fidelity_std):
   ax2.legend(loc='upper left')
   plt.show()
 
-def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_distr, title=None):
+def pl_fid_s_cvx_distr(x, mean_s_cvx, fidelity_mean, s_cvx_distr, title=None):
   # Создаем общую фигуру с subfigures
   fig = plt.figure(figsize=(15, 4))
   gs = GridSpec(1, 5, width_ratios=[2, 0, 2, 0.0, 2])
@@ -330,15 +330,14 @@ def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_di
 
   # Первая subfigure для графика SVX
   ax1 = fig.add_subplot(gs[0])
-  ax1.errorbar(x, mean_s_cvx, 
-             yerr=std,  # вертикальные погрешности
+  ax1.errorbar(x, mean_s_cvx,
              fmt='o',   # стиль маркера (кружки)
              color='blue', 
-             markersize=3, 
-             capsize=2,  # размер "шапочки" погрешности
-             label=r'$S_{\mathrm{cvx}} \pm$ std')
+             markersize=3)
+  
   # Дополнительная тонкая линия, соединяющая точки (опционально)
   ax1.plot(x, mean_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
+  ax1.tick_params(axis='both', direction='in')
   ax1.set_title(r"График зависимости $S_{\mathrm{cvx}}$" +"\nот количества измерений")
   ax1.set_xlabel('Количество измерений')
   ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
@@ -351,12 +350,9 @@ def pl_fid_s_cvx_distr(x, mean_s_cvx, std, fidelity_mean, fidelity_std, s_cvx_di
   
   ax2 = fig.add_subplot(gs[2])
   ax2.errorbar(x, fidelity_mean, 
-             yerr=fidelity_std,  # вертикальные погрешности
              fmt='o',            # стиль маркера (кружки)
              color='green', 
-             markersize=3, 
-             capsize=4,          # размер "шапочки" погрешности
-             label='Fidelity ± std')
+             markersize=3)
   
   # ax2.set_yscale('log')
   # Дополнительная тонкая линия, соединяющая точки (как в исходном коде)
