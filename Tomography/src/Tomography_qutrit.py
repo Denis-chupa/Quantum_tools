@@ -253,7 +253,10 @@ class tomography_pol_qutrit:
       sigma3 = prepare_sigma(sigma3, n)
 
       # предобработка
-      self.start_density = self.density(start_state)
+      if start_state.shape[1] == 1:
+        self.start_density = self.density(start_state)
+      else:
+        self.start_density = start_state
       ph = k[::3] / sigma1
       phv = k[1::3] / sigma2
       pv = k[2::3] / sigma3
