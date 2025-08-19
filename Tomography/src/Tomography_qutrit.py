@@ -1,4 +1,4 @@
-from numpy import array, linalg, ones, conj, trace, zeros, column_stack, full, hstack, cos, sin, pi, diag
+from numpy import array, linalg, ones, conj, trace, zeros, column_stack, full, cos, sin, pi, diag, isscalar, concatenate
 from scipy.linalg import sqrtm
 
 
@@ -70,7 +70,6 @@ class tomography_pol_qutrit:
     self.dd = array([[1 / 2], [1 / (2)**0.5], [1 / 2]])
     self.ll = array([[1 / 2], [-1j / (2)**0.5], [-1 / 2]])
 
-  
   def psi(self, r):
     """
     Превращение матрицы плотности в матрицу состояния кутрита.
@@ -197,7 +196,7 @@ class tomography_pol_qutrit:
         #Создание матрицы Q
         Q=0
         for j in range(0,N):
-          Q += (sigma[j//self.len_protocol]) * self.projectors[j]
+          Q += (sigma[j]) * self.projectors[j]
 
         #Метод простых итераций
         Psi0 = self.psi(r0)
@@ -241,6 +240,18 @@ class tomography_pol_qutrit:
       матрицей.
       """
 
+      # предобработка sigma
+      def prepare_sigma(sigma, length):
+        if isscalar(sigma):
+            return full(length, sigma)  # растянуть число в массив
+        else:
+            return sigma
+
+      n = len(k) // 3
+      sigma1 = prepare_sigma(sigma1, n)
+      sigma2 = prepare_sigma(sigma2, n)
+      sigma3 = prepare_sigma(sigma3, n)
+
       # предобработка
       self.start_density = self.density(start_state)
       ph = k[::3] / sigma1
@@ -249,7 +260,7 @@ class tomography_pol_qutrit:
       k = list(k[::3]) + list(k[1::3]) + list(k[2::3])
       p = array(list(ph) + list(phv) + list(pv))
       self.matrix_psevdoin = self.psevdoin(p.reshape(3 * self.len_protocol, 1), rank=rank)                               #Нахождение матрицы плотности с помощью псевдоинверсии
-      self.matrix_finish = self.result(self.matrix_psevdoin, k, [sigma1,sigma2,sigma3], epsilon, max_iter, alpha)      #Полученная матрицы с помощью метода простых итераций
+      self.matrix_finish = self.result(self.matrix_psevdoin, k, concatenate([sigma1, sigma2, sigma3]), epsilon, max_iter, alpha)      #Полученная матрицы с помощью метода простых итераций
 
       if visible == True:
           print("Fidelity between start matrix density and matrix pseudoinversion =", abs(self.Fidelity(self.matrix_psevdoin, self.start_density)))
