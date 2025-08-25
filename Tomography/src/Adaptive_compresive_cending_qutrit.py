@@ -44,8 +44,9 @@ class ACT:
     # Normalization of a function by the sum of squares                      
     norm_sum_squares = lambda self, x: x/(np.sum(abs(x)**2))**0.5                    
     
-    def main(self , rank_psevdoin: int = None, type_ml: str = "default", Z : np.ndarray = None, random_r : np.ndarray = None,\
-              type_solve_semidefinite_program = None, epsilon_ml : np.float16 = 10**-11, epsilon_act : np.float16 = 10**-5, max_iters_in_semidefinite_program = 10**7):
+    def main(self, rank_psevdoin: int=None, type_ml: str="default", Z: np.ndarray=None, random_r: np.ndarray=None,\
+              type_solve_semidefinite_program=None, epsilon_ml: np.float16=10**-11, epsilon_act: np.float16=10**-5, max_iters_in_semidefinite_program=10**7,\
+              repeat_semidefinite: int=2, minimize_trace_semidefinite: bool=True):
         
         self.epsilon = epsilon_act
         self.max_iters_in_semidefinite_program = max_iters_in_semidefinite_program
@@ -103,6 +104,7 @@ class ACT:
             r0 = my_class_ml.psevdoin(np.array(prob_my_class)[:, np.newaxis], rank = rank_psevdoin)    #Нахождение матрицы плотности с помощью псевдоинверсии
             R = my_class_ml.result(r0, prob_my_class, full(3 * self.len_protocol, 1), epsilon=epsilon_ml)                   #Полученная матрицы с помощью метода простых итераций
             R_list[k] = [[str(item) for item in row] for row in R.tolist()]
+            self.tomography_state = R
             fidelity_list[k] = self.Fidelity(R, self.random_r)
             probability = []
             for i in range(len(start_protocol)):
@@ -110,8 +112,8 @@ class ACT:
           elif type_ml == "without_ml":
             probability = v
 
-          self.f_max_0, x_max =  self.semidefinite_program(start_protocol[:3], probability[:3], "maximize") # задаю max(f) на нулевом шаге, f = tr{XZ}
-          self.f_min_0, x_min =  self.semidefinite_program(start_protocol[:3], probability[:3], "minimize") # задаю min(f) на нулевом шаге, f = tr{XZ}
+          self.f_max_0, x_max =  self.semidefinite_program(start_protocol[:3], probability[:3], "maximize", repeat_semidefinite, minimize_trace_semidefinite) # задаю max(f) на нулевом шаге, f = tr{XZ}
+          self.f_min_0, x_min =  self.semidefinite_program(start_protocol[:3], probability[:3], "minimize", repeat_semidefinite, minimize_trace_semidefinite) # задаю min(f) на нулевом шаге, f = tr{XZ}
           semi_max, x_max = self.semidefinite_program(start_protocol, probability, "maximize")
           semi_min, x_min = self.semidefinite_program(start_protocol, probability, "minimize")
           svx = (semi_max - semi_min) / (self.f_max_0 - self.f_min_0)
@@ -168,7 +170,7 @@ class ACT:
       """
       return np.dot(psi,np.transpose(np.conj(psi)))
    
-    def semidefinite_program(self, A, b, mode: str):
+    def semidefinite_program(self, A, b, mode: str, repeat: int=2, minimize_trace: bool=True):
         """
         Searches for the maximum or minimum value of s_cvx
         Args:
@@ -180,38 +182,65 @@ class ACT:
         # The operator >> denotes matrix inequality.
         constraints = [X >> 0]
         constraints += [X == cp.conj((X).T)]
+        start_state = self.tomography_state
         # constraints += [cp.trace(X) == 1]  # added 23.11 возможно избыточно.
         constraints += [cp.trace(A[i] @ X) == b[i] for i in range(len(b))]
-        
-        if mode == "maximize":
-          prob = cp.Problem(cp.Maximize(cp.trace(cp.real(self.Z @ X))),
-                          constraints)
-        elif mode == "minimize":
-          prob = cp.Problem(cp.Minimize(cp.trace(cp.real(self.Z @ X))),
-                          constraints)
-        else:
-          print("unknow mode")
 
-        if self.solve_semidef == cp.MOSEK:
-          solver_opts = {
-            "MSK_IPAR_OPTIMIZER": 0,
-            "MSK_DPAR_INTPNT_TOL_REL_GAP": self.epsilon,
-            "MSK_IPAR_INTPNT_MAX_ITERATIONS": self.max_iters_in_semidefinite_program  # Set max iterations for interior-point method
-          }
-          prob.solve(solver=self.solve_semidef, mosek_params=solver_opts)
-        elif self.solve_semidef == cp.SCS:
-          prob.solve(solver=self.solve_semidef, max_iters = self.max_iters_in_semidefinite_program, eps = self.epsilon)
-        elif self.solve_semidef == cp.ECOS:
-          prob.solve(solver=cp.ECOS, max_iters = self.max_iters_in_semidefinite_program, verbose=True)
-        elif self.solve_semidef == cp.CVXOPT:
-          prob.solve(solver=cp.CVXOPT, solver_opts={"maxiter": self.max_iters_in_semidefinite_program})
-        elif self.solve_semidef == cp.GUROBI:
-          prob.solve(solver=cp.GUROBI)
-        else:
-          print("Unknown solver")
-          return 0
+        for i in range(repeat):
+
+          if minimize_trace:
+            X.value = self.minimize_trace(constraints, start_state)
+          else:
+            X.value = start_state
+          
+          if mode == "maximize":
+            prob = cp.Problem(cp.Maximize(cp.trace(cp.real(self.Z @ X))),
+                            constraints)
+          elif mode == "minimize":
+            prob = cp.Problem(cp.Minimize(cp.trace(cp.real(self.Z @ X))),
+                            constraints)
+          else:
+            print("unknow mode")
+
+          if self.solve_semidef == cp.MOSEK:
+            solver_opts = {
+              "MSK_IPAR_OPTIMIZER": 0,
+              "MSK_DPAR_INTPNT_TOL_REL_GAP": self.epsilon,
+              "MSK_IPAR_INTPNT_MAX_ITERATIONS": self.max_iters_in_semidefinite_program  # Set max iterations for interior-point method
+            }
+            prob.solve(solver=self.solve_semidef, mosek_params=solver_opts)
+          elif self.solve_semidef == cp.SCS:
+            prob.solve(solver=self.solve_semidef, max_iters = self.max_iters_in_semidefinite_program, eps = self.epsilon, warm_start=True)
+          elif self.solve_semidef == cp.ECOS:
+            prob.solve(solver=cp.ECOS, max_iters = self.max_iters_in_semidefinite_program, verbose=True)
+          elif self.solve_semidef == cp.CVXOPT:
+            prob.solve(solver=cp.CVXOPT, solver_opts={"maxiter": self.max_iters_in_semidefinite_program})
+          elif self.solve_semidef == cp.GUROBI:
+            prob.solve(solver=cp.GUROBI)
+          else:
+            print("Unknown solver")
+            return 0
+
+          start_state = X.value
+
         return prob.value, X.value
 
+    def minimize_trace(self, constraints, start_matrix):
+          
+          X = cp.Variable((self.n,self.n), complex=True)  
+          # The operator >> denotes matrix inequality.
+          constraints = constraints
+
+          X.value = start_matrix
+          prob = cp.Problem(cp.Minimize(cp.trace(cp.real(X))), constraints)
+          prob.solve(solver=cp.SCS, max_iters = self.max_iters_in_semidefinite_program, eps = self.epsilon, warm_start=True)
+          
+          rho_hat = X.value
+          rho_hat /= np.trace(rho_hat)
+
+          return rho_hat
+
+       
 convert_dictlist_to_matrix = lambda matrix_str: np.array([[complex(cell) for cell in row] for row in matrix_str])
 
 def save_json_fix_z():
