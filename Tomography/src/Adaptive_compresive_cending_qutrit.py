@@ -101,7 +101,7 @@ class ACT:
 
           if type_ml == "default":
             r0 = my_class_ml.psevdoin(np.array(prob_my_class)[:, np.newaxis], rank = rank_psevdoin)    #Нахождение матрицы плотности с помощью псевдоинверсии
-            R = my_class_ml.result(r0, prob_my_class, [1, 1, 1], epsilon=epsilon_ml)                   #Полученная матрицы с помощью метода простых итераций
+            R = my_class_ml.result(r0, prob_my_class, full(3 * self.len_protocol, 1), epsilon=epsilon_ml)                   #Полученная матрицы с помощью метода простых итераций
             R_list[k] = [[str(item) for item in row] for row in R.tolist()]
             fidelity_list[k] = self.Fidelity(R, self.random_r)
             probability = []
