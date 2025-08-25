@@ -323,7 +323,7 @@ def pl_fid_s_cvx(x, mean_s_cvx, std, fidelity_mean, fidelity_std):
 def pl_fid_s_cvx_distr(x, mean_s_cvx, fidelity_mean, s_cvx_distr, title=None):
   # Создаем общую фигуру с subfigures
   fig = plt.figure(figsize=(15, 4))
-  gs = GridSpec(1, 5, width_ratios=[2, 0, 2, 0.0, 2])
+  gs = GridSpec(1, 7, width_ratios=[2, 0, 2, 0.0, 2])
   
   if title:
       fig.suptitle(title, fontsize=14, y=1.1)
@@ -381,3 +381,103 @@ def pl_fid_s_cvx_distr(x, mean_s_cvx, fidelity_mean, s_cvx_distr, title=None):
   ax3.set_ylabel(r'$S_{\mathrm{cvx}}$') 
   ax3.set_xticks([])
   plt.show()
+
+
+
+
+def pl_fid_s_cvx_distr_plus(x, max_s_cvx, max_fidelity, s_cvx_distr, title=None):
+
+  ymax_cvx = np.max(abs(s_cvx_distr))
+  
+  # Создаем общую фигуру с subfigures
+  fig = plt.figure(figsize=(20, 4))
+  gs = GridSpec(1, 7, width_ratios=[2, 0, 2, 0.0, 2, 0.0, 2])
+  
+  if title:
+      fig.suptitle(title, fontsize=14, y=1.1)
+
+  # Первая subfigure для графика SVX
+  ax1 = fig.add_subplot(gs[0])
+  ax1.errorbar(x, max_s_cvx,
+             fmt='o',   # стиль маркера (кружки)
+             color='blue', 
+             markersize=3)
+  
+  # Дополнительная тонкая линия, соединяющая точки (опционально)
+  ax1.plot(x, max_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
+  ax1.tick_params(axis='both', direction='in')
+  ax1.set_title(r"График зависимости $S_{\mathrm{cvx}}$" +"\nот количества измерений\n")
+  ax1.set_xlabel('Количество измерений')
+  ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
+  ax1.set_xticks(x)
+  ax1.set_ylim(-0.1, 1.1)
+  ax1.set_xlim(0.8, len(x)+0.2)
+  ax1.grid(True)
+
+  # Вторая subfigure для графика Fidelity
+  
+  ax2 = fig.add_subplot(gs[2])
+  ax2.errorbar(x, max_fidelity, 
+             fmt='o',            # стиль маркера (кружки)
+             color='green', 
+             markersize=3)
+  
+  # ax2.set_yscale('log')
+  # Дополнительная тонкая линия, соединяющая точки (как в исходном коде)
+  ax2.plot(x, max_fidelity, color='green', alpha=0.3, linestyle='--', linewidth=1)
+  ax2.tick_params(axis='both', direction='in')
+  ax2.set_title("График зависимости Fidelity\nот количества измерений\n")
+  ax2.set_xlabel('Количество измерений')
+  ax2.set_ylabel('Fidelity')
+  ax2.set_ylim(-0.1, 1.1)
+  ax2.set_xticks(x)
+  ax2.set_xlim(0.8, len(x) + 0.2)
+  ax2.grid(True)
+  
+
+
+
+  # Третья subfigure для распределения последнего измерения
+  ax3 = fig.add_subplot(gs[4])
+  ax3.boxplot(s_cvx_distr, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+  ax3.tick_params(axis='both', direction='in')
+  
+  # ax3.set_yscale('log')
+  # ax3.set_xlabel('\n Количество измерений')
+  ax3.ticklabel_format(style='sci', axis='y', scilimits=(-3,3))
+  if ymax_cvx < 1e-2:
+      ax3.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$')
+  else:
+      ax3.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$' + "\n")
+  ax3.set_ylabel(r'$S_{\mathrm{cvx}}$') 
+  ax3.set_xticks([])
+
+  # Третья subfigure для распределения последнего измерения
+  ax4 = fig.add_subplot(gs[6])
+  # строим boxplot
+  bp = plt.boxplot(s_cvx_distr)
+
+  # ищем минимальное и максимальное значение по усам (без выбросов)
+  ymin = min([line.get_ydata().min() for line in bp['whiskers']])
+  ymax = max([line.get_ydata().max() for line in bp['whiskers']])
+
+  
+  ax4.boxplot(s_cvx_distr, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+  ax4.tick_params(axis='both', direction='in')
+  
+  # ax3.set_yscale('log')
+  # ax4.set_xlabel('Количество измерений')
+  ax4.ticklabel_format(style='sci', axis='y', scilimits=(-3,3))
+  if ymax < 1e-2:
+      ax4.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$')
+  else:
+      ax4.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$' + "\n")
+  ax4.set_ylabel(r'$S_{\mathrm{cvx}}$') 
+  ax4.set_xticks([])
+  # обрезаем ось Y по этим границам
+  ax4.set_ylim(ymin, ymax)
+
+
+  plt.show()
+
+  
