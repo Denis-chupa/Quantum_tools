@@ -13,14 +13,14 @@ import numpy as np
     "rank, dim, protocol",
     [   
         # протокол из статьи богданова
-        (1,3,None),
-        (2,3,None),
-        (3,3,None),
+        (1, 3, None),
+        (2, 3, None),
+        (3, 3, None),
 
         # протокол с пластинкой λ/4
-        (1,3,[Gl_4(0),Gl_4(np.pi/8),Gl_4(3*np.pi/8),Gl_4(5*np.pi/8),Gl_4(7*np.pi/8)]),
-        (2,3,[Gl_4(0),Gl_4(np.pi/8),Gl_4(3*np.pi/8),Gl_4(5*np.pi/8),Gl_4(7*np.pi/8)]),
-        (3,3,[Gl_4(0),Gl_4(np.pi/8),Gl_4(3*np.pi/8),Gl_4(5*np.pi/8),Gl_4(7*np.pi/8)])
+        (1, 3, [Gl_4(0), Gl_4(np.pi/8), Gl_4(3 * np.pi/8), Gl_4(5 * np.pi/8), Gl_4(7 * np.pi/8)]),
+        (2, 3, [Gl_4(0), Gl_4(np.pi/8), Gl_4(3 * np.pi/8), Gl_4(5 * np.pi/8), Gl_4(7 * np.pi/8)]),
+        (3, 3, [Gl_4(0), Gl_4(np.pi/8), Gl_4(3 * np.pi/8), Gl_4(5 * np.pi/8), Gl_4(7 * np.pi/8)])
       ]
 )
 def test_result(rank, dim, protocol):

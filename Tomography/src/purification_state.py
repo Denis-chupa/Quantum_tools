@@ -36,23 +36,19 @@ class Purification:
             ])
         else:
             m = len(self.protocol)
-            matrix_x = np.zeros((m * 2, 3), dtype=complex)
+            matrix_x = np.zeros((m * 3, 3), dtype=complex)
             k = 0
             for i in self.protocol:
-                for A in ([A01, A03]):
+                for A in ([A01, A02, A03]):
                     row = (i @ A @ np.array([[1],[1],[1]])).T
-                    # # print(row)
-                    # row = row/(np.sum(abs(row)**2))**0.5
-                    # print(np.sum(abs(row)**2))
                     matrix_x[k] = row
                     k += 1
 
 
         c = self.purification_state()
-        H, lambda_j = self.matrix_information(matrix_x, c, np.full(m * 2, 1))
+        H, lambda_j = self.matrix_information(matrix_x, c, np.full(m * 3, 1))
         
         val_H, vec_H = np.linalg.eig(H) 
-
         
         return val_H
 
@@ -75,14 +71,14 @@ class Purification:
         vector_without_zeros = []
         value_without_zeros = []
         for i in range(N):
-            if np.round(w[i],10) != 0.0:
+            if np.round(w[i], 14) != 0.0:
                 vector_without_zeros.append(v[:, i])
                 value_without_zeros.append(w[i]**0.5)
         pure_state = 0
         for i in range(self.rank):
             e_i = np.zeros((self.rank, 1))
             e_i[i] = 1
-            pure_state += value_without_zeros[i] * (np.kron(e_i, (vector_without_zeros[i])[:,np.newaxis]))
+            pure_state += value_without_zeros[i] * (np.kron(e_i, (vector_without_zeros[i])[:, np.newaxis]))
         return pure_state
         
     @staticmethod
@@ -136,9 +132,9 @@ class Purification:
         N = X.shape[0]
 
         X_l = np.zeros((self.rank * N, self.rank * self.dimension), complex)
-        L = [0]*N 
+        L = [0] * N 
 
-        lambda_j = [0]*N 
+        lambda_j = [0] * N 
 
         c_real = self.real_state(c)
         for n in range(N):
@@ -155,7 +151,7 @@ class Purification:
 
         H = np.zeros((2 * self.rank * self.dimension, 2 * self.rank * self.dimension))
         for j in range(N):
-            H += 2 * t[j]/lambda_j[j] * (L[j] @ c_real) @ np.conj(L[j] @ c_real).T
+            H += 2 * t[j] / lambda_j[j] * (L[j] @ c_real) @ np.conj(L[j] @ c_real).T
 
         return H, lambda_j
         
