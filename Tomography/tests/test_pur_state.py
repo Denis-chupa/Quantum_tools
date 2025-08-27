@@ -78,7 +78,7 @@ import numpy as np
 )
 def test_result(rank, dimension, start_matrix, teor_matrix):
     p = Purification(rank=rank, dimension=dimension)
-    result_matrix = p.purification_state(start_matrix, rank)
+    result_matrix = p.purification_state(start_matrix)
     assert np.array_equal(result_matrix, teor_matrix)
 
 
@@ -109,7 +109,7 @@ def test_len_new_matrix(repeat):
         rank = np.random.randint(1,dimension)
     p = Purification(rank=rank, dimension=dimension)
     rho = p.r_rank_r(rank, dimension, "complex")
-    result_matrix = p.purification_state(rho, rank)
+    result_matrix = p.purification_state(rho)
     rows = result_matrix.shape[0]
     assert rows == rank * dimension
 
@@ -122,6 +122,6 @@ def test_norm_new_matrix(repeat):
         rank = np.random.randint(1,dimension)
     p = Purification(rank=rank, dimension=dimension)
     rho = p.r_rank_r(rank, dimension, "complex")
-    result_matrix = p.purification_state(rho, rank)
+    result_matrix = p.purification_state(rho)
     print( np.real(np.conj(result_matrix.T) @ result_matrix))
     assert np.round((np.conj(result_matrix.T) @ result_matrix),10) == 1.0

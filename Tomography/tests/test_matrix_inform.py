@@ -33,7 +33,7 @@ def test_2n(rank, dimension):
         [1/((2*2**0.5)), 0, 1j/((2*2**0.5))],
         [1/((2*2**0.5)), 0, -1/((2*2**0.5))]
     ])
-    H, lambda_j = p.matrix_information(matrix_x, c, rank, np.full(m*3, 1))
+    H, lambda_j = p.matrix_information(matrix_x, c, np.full(m*3, 1))
     c_real = p.real_state(c)
     assert np.round(np.conj(c_real.T) @ H @ c_real,10) == np.round(2*(np.sum(lambda_j)),10)
 

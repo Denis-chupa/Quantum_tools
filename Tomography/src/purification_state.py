@@ -24,39 +24,39 @@ class Purification:
         if self.protocol is None:
             m = 9
             matrix_x = np.array([
-                [1/2**0.5, 0, 0],
-                [0, 1/2, 0],
-                [0, 0, 1/2**0.5],
-                [0, 1/(2*2**0.5), -1j/2],
-                [0, 1/(2*2**0.5), -1/2],
-                [1/2, -1/((2*2**0.5)), 0],
-                [1/2, -1j/((2*2**0.5)), 0],
-                [1/((2*2**0.5)), 0, 1j/((2*2**0.5))],
-                [1/((2*2**0.5)), 0, -1/((2*2**0.5))]
+                [1 / 2**0.5, 0, 0],
+                [0, 1 / 2, 0],
+                [0, 0, 1 / 2**0.5],
+                [0, 1 / (2*2**0.5), -1j/2],
+                [0, 1 / (2*2**0.5), -1/2],
+                [1 / 2, -1 / ((2*2**0.5)), 0],
+                [1 / 2, -1j / ((2*2**0.5)), 0],
+                [1 / ((2*2**0.5)), 0, 1j / ((2*2**0.5))],
+                [1 / ((2*2**0.5)), 0, -1 / ((2*2**0.5))]
             ])
         else:
             m = len(self.protocol)
-            matrix_x = np.zeros((m*2,3), complex)
+            matrix_x = np.zeros((m * 2, 3), dtype=complex)
             k = 0
             for i in self.protocol:
-                for A in ([A01,A03]):
-                    row = (i @ A @  np.array([[1],[1],[1]])).T
+                for A in ([A01, A03]):
+                    row = (i @ A @ np.array([[1],[1],[1]])).T
                     # # print(row)
                     # row = row/(np.sum(abs(row)**2))**0.5
                     # print(np.sum(abs(row)**2))
                     matrix_x[k] = row
-                    k+=1
+                    k += 1
 
 
         c = self.purification_state()
-        H, lambda_j = self.matrix_information(matrix_x, c, self.rank, np.full(m*2, 1))
+        H, lambda_j = self.matrix_information(matrix_x, c, np.full(m * 2, 1))
         
         val_H, vec_H = np.linalg.eig(H) 
 
         
         return val_H
 
-    def purification_state(self, state: np.ndarray = None, rank: int = None):
+    def purification_state(self, state: np.ndarray = None):
         """
         Purification of the quantum state in the form of Schmidt decomposition : |c> = sum (p_i)^0.5 * |e_i> * |c_i> 
         |c_i> - eigen state |c>.
@@ -69,8 +69,6 @@ class Purification:
         """
         if state is None:
             state = self.state
-        if rank is None:
-            rank = self.rank
 
         N = len(state)
         w, v = np.linalg.eig(state)
@@ -81,8 +79,8 @@ class Purification:
                 vector_without_zeros.append(v[:, i])
                 value_without_zeros.append(w[i]**0.5)
         pure_state = 0
-        for i in range(rank):
-            e_i = np.zeros((rank,1))
+        for i in range(self.rank):
+            e_i = np.zeros((self.rank, 1))
             e_i[i] = 1
             pure_state += value_without_zeros[i] * (np.kron(e_i, (vector_without_zeros[i])[:,np.newaxis]))
         return pure_state
@@ -123,7 +121,7 @@ class Purification:
         real_m = np.block([[real_path, -im_path],[im_path, real_path]])
         return real_m
 
-    def matrix_information(self, X: np.ndarray, c: np.ndarray, rank: int, t: list):
+    def matrix_information(self, X: np.ndarray, c: np.ndarray, t: list):
         """
         Create matrix information.
         Args:
@@ -137,25 +135,25 @@ class Purification:
         """
         N = X.shape[0]
 
-        X_l = np.zeros((rank * N, rank * self.dimension), complex)
+        X_l = np.zeros((self.rank * N, self.rank * self.dimension), complex)
         L = [0]*N 
 
         lambda_j = [0]*N 
 
         c_real = self.real_state(c)
         for n in range(N):
-            L_j = np.zeros((2 * rank * self.dimension, 2 * rank * self.dimension))
-            for i in range(rank):
-                e_i = np.zeros((rank,1))
+            L_j = np.zeros((2 * self.rank * self.dimension, 2 * self.rank * self.dimension))
+            for i in range(self.rank):
+                e_i = np.zeros((self.rank, 1))
                 e_i[i] = 1
                 X_l[n+i] = np.kron(np.conj(e_i.T), X[n])
-                X_l_real = self.real_matrix(X_l[n+i])
+                X_l_real = self.real_matrix(X_l[n + i])
                 L_j += np.conj((X_l_real).T) @ X_l_real
             
             L[n] = L_j
             lambda_j[n] = (np.conj(c_real.T) @ L[n] @ c_real)[0][0]
 
-        H = np.zeros((2 * rank * self.dimension, 2 * rank * self.dimension))
+        H = np.zeros((2 * self.rank * self.dimension, 2 * self.rank * self.dimension))
         for j in range(N):
             H += 2 * t[j]/lambda_j[j] * (L[j] @ c_real) @ np.conj(L[j] @ c_real).T
 
