@@ -46,7 +46,7 @@ class ACT:
     
     def main(self, rank_psevdoin: int=None, type_ml: str="default", Z: np.ndarray=None, random_r: np.ndarray=None,\
               type_solve_semidefinite_program=None, epsilon_ml: np.float16=10**-11, epsilon_act: np.float16=10**-5, max_iters_in_semidefinite_program=10**7,\
-              repeat_semidefinite: int=2, minimize_trace_semidefinite: bool=True):
+              repeat_semidefinite: int=1, minimize_trace_semidefinite: bool=False):
         
         self.epsilon = epsilon_act
         self.max_iters_in_semidefinite_program = max_iters_in_semidefinite_program
@@ -114,8 +114,8 @@ class ACT:
 
           self.f_max_0, x_max =  self.semidefinite_program(start_protocol[:3], probability[:3], "maximize", repeat_semidefinite, minimize_trace_semidefinite) # задаю max(f) на нулевом шаге, f = tr{XZ}
           self.f_min_0, x_min =  self.semidefinite_program(start_protocol[:3], probability[:3], "minimize", repeat_semidefinite, minimize_trace_semidefinite) # задаю min(f) на нулевом шаге, f = tr{XZ}
-          semi_max, x_max = self.semidefinite_program(start_protocol, probability, "maximize")
-          semi_min, x_min = self.semidefinite_program(start_protocol, probability, "minimize")
+          semi_max, x_max = self.semidefinite_program(start_protocol, probability, "maximize", repeat_semidefinite, minimize_trace_semidefinite)
+          semi_min, x_min = self.semidefinite_program(start_protocol, probability, "minimize", repeat_semidefinite, minimize_trace_semidefinite)
           svx = (semi_max - semi_min) / (self.f_max_0 - self.f_min_0)
 
           x_min_list[k] = [[str(item) for item in row] for row in x_min.tolist()]
@@ -170,7 +170,7 @@ class ACT:
       """
       return np.dot(psi,np.transpose(np.conj(psi)))
    
-    def semidefinite_program(self, A, b, mode: str, repeat: int=2, minimize_trace: bool=True):
+    def semidefinite_program(self, A, b, mode: str, repeat: int=2, min_trace: bool=True):
         """
         Searches for the maximum or minimum value of s_cvx
         Args:
@@ -182,16 +182,16 @@ class ACT:
         # The operator >> denotes matrix inequality.
         constraints = [X >> 0]
         constraints += [X == cp.conj((X).T)]
-        start_state = self.tomography_state
         # constraints += [cp.trace(X) == 1]  # added 23.11 возможно избыточно.
         constraints += [cp.trace(A[i] @ X) == b[i] for i in range(len(b))]
 
+        start_state = self.tomography_state
+        
+        X.value = start_state.copy()
         for i in range(repeat):
-
-          if minimize_trace:
-            X.value = self.minimize_trace(constraints, start_state)
-          else:
-            X.value = start_state
+          
+          if min_trace:
+            X.value = self.minimize_trace(A, b, start_state)
           
           if mode == "maximize":
             prob = cp.Problem(cp.Maximize(cp.trace(cp.real(self.Z @ X))),
@@ -221,21 +221,22 @@ class ACT:
             print("Unknown solver")
             return 0
 
-          start_state = X.value
+          start_state = X.value.copy()
 
         return prob.value, X.value
 
-    def minimize_trace(self, constraints, start_matrix):
+    def minimize_trace(self, A, b, start_matrix):
           
-          X = cp.Variable((self.n,self.n), complex=True)  
+          X_minimize = cp.Variable((self.n,self.n), complex=True)  
           # The operator >> denotes matrix inequality.
-          constraints = constraints
+          constraints_minimize = [X_minimize >> 0]
+          constraints_minimize += [X_minimize == cp.conj((X_minimize).T)]
+          constraints_minimize += [cp.trace(A[i] @ X_minimize) == b[i] for i in range(len(b))]
 
-          X.value = start_matrix
-          prob = cp.Problem(cp.Minimize(cp.trace(cp.real(X))), constraints)
+          X_minimize.value = start_matrix
+          prob = cp.Problem(cp.Minimize(cp.trace(cp.real(X_minimize))), constraints_minimize)
           prob.solve(solver=cp.SCS, max_iters = self.max_iters_in_semidefinite_program, eps = self.epsilon, warm_start=True)
-          
-          rho_hat = X.value
+          rho_hat = X_minimize.value
           rho_hat /= np.trace(rho_hat)
 
           return rho_hat
@@ -435,7 +436,7 @@ def pl_fid_s_cvx_distr_plus(x, max_s_cvx, max_fidelity, s_cvx_distr, title=None)
   # Дополнительная тонкая линия, соединяющая точки (опционально)
   ax1.plot(x, max_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
   ax1.tick_params(axis='both', direction='in')
-  ax1.set_title(r"График зависимости $S_{\mathrm{cvx}}$" +"\nот количества измерений\n")
+  ax1.set_title(r"График зависимости $S_{\mathrm{cvx}}$" +"\nот количества измерений")
   ax1.set_xlabel('Количество измерений')
   ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
   ax1.set_xticks(x)
@@ -455,7 +456,7 @@ def pl_fid_s_cvx_distr_plus(x, max_s_cvx, max_fidelity, s_cvx_distr, title=None)
   # Дополнительная тонкая линия, соединяющая точки (как в исходном коде)
   ax2.plot(x, max_fidelity, color='green', alpha=0.3, linestyle='--', linewidth=1)
   ax2.tick_params(axis='both', direction='in')
-  ax2.set_title("График зависимости Fidelity\nот количества измерений\n")
+  ax2.set_title("График зависимости Fidelity\nот количества измерений")
   ax2.set_xlabel('Количество измерений')
   ax2.set_ylabel('Fidelity')
   ax2.set_ylim(-0.1, 1.1)
@@ -474,10 +475,7 @@ def pl_fid_s_cvx_distr_plus(x, max_s_cvx, max_fidelity, s_cvx_distr, title=None)
   # ax3.set_yscale('log')
   # ax3.set_xlabel('\n Количество измерений')
   ax3.ticklabel_format(style='sci', axis='y', scilimits=(-3,3))
-  if ymax_cvx < 1e-2:
-      ax3.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$')
-  else:
-      ax3.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$' + "\n")
+  ax3.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$')
   ax3.set_ylabel(r'$S_{\mathrm{cvx}}$') 
   ax3.set_xticks([])
 
@@ -497,10 +495,7 @@ def pl_fid_s_cvx_distr_plus(x, max_s_cvx, max_fidelity, s_cvx_distr, title=None)
   # ax3.set_yscale('log')
   # ax4.set_xlabel('Количество измерений')
   ax4.ticklabel_format(style='sci', axis='y', scilimits=(-3,3))
-  if ymax < 1e-2:
-      ax4.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$')
-  else:
-      ax4.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$' + "\n")
+  ax4.set_title(r'Распределение последнего ' + '\n' + r' значения $S_{\mathrm{cvx}}$')
   ax4.set_ylabel(r'$S_{\mathrm{cvx}}$') 
   ax4.set_xticks([])
   # обрезаем ось Y по этим границам
