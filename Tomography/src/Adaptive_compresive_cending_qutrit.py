@@ -186,13 +186,23 @@ class ACT:
         constraints += [cp.trace(A[i] @ X) == b[i] for i in range(len(b))]
 
         start_state = self.tomography_state
-        
+        # lam = self.epsilon * 10
         X.value = start_state.copy()
         for i in range(repeat):
           
           if min_trace:
             X.value = self.minimize_trace(A, b, start_state)
           
+            # if mode == "maximize":
+            #   prob = cp.Problem(cp.Maximize(cp.real(cp.trace(self.Z @ X)) - lam * cp.real(cp.normNuc(X))),
+            #                   constraints)
+            # elif mode == "minimize":
+            #   prob = cp.Problem(cp.Minimize(cp.real(cp.trace(self.Z @ X)) + lam * cp.real(cp.normNuc(X))),
+            #                   constraints)
+            # else:
+            #   print("unknow mode")
+
+          # else:          
           if mode == "maximize":
             prob = cp.Problem(cp.Maximize(cp.trace(cp.real(self.Z @ X))),
                             constraints)
@@ -223,7 +233,7 @@ class ACT:
 
           start_state = X.value.copy()
 
-        return prob.value, X.value
+        return prob.value, X.value/np.trace(X.value)
 
     def minimize_trace(self, A, b, start_matrix):
           
@@ -234,7 +244,7 @@ class ACT:
           constraints_minimize += [cp.trace(A[i] @ X_minimize) == b[i] for i in range(len(b))]
 
           X_minimize.value = start_matrix
-          prob = cp.Problem(cp.Minimize(cp.trace(cp.real(X_minimize))), constraints_minimize)
+          prob = cp.Problem(cp.Minimize(cp.real(cp.trace(X_minimize))), constraints_minimize)
           prob.solve(solver=cp.SCS, max_iters = self.max_iters_in_semidefinite_program, eps = self.epsilon, warm_start=True)
           rho_hat = X_minimize.value
           rho_hat /= np.trace(rho_hat)
