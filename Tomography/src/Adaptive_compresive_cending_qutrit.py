@@ -312,52 +312,51 @@ def save_json_fix_z():
 
   print("Данные успешно сохранены в 'matrix_and_parameters.json'.")
 
-def pl_fid_s_cvx(x, mean_s_cvx, std, fidelity_mean, fidelity_std):
+def pl_fid_s_cvx(x, max_s_cvx, max_fidelity, title=None):
   # Создаем общую фигуру с subfigures
   fig = plt.figure(constrained_layout=True, figsize=(10, 5))
-  subfigs = fig.subfigures(1, 2)  # одна строка, две колонки
+  gs = GridSpec(1, 3, width_ratios=[2, 0.01, 2], figure=fig) # одна строка, две колонки
 
+  if title:
+      fig.suptitle(title, fontsize=14, y=1.1)
 
   # Первая subfigure для графика SVX
-  ax1 = subfigs[0].subplots()
-  ax1.errorbar(x, mean_s_cvx, 
-             yerr=std,  # вертикальные погрешности
+  ax1 = fig.add_subplot(gs[0])
+  ax1.errorbar(x, max_s_cvx,
              fmt='o',   # стиль маркера (кружки)
              color='blue', 
-             markersize=3, 
-             capsize=2,  # размер "шапочки" погрешности
-             label=r'$S_{\mathrm{cvx}} \pm$ std')
-  # ax1.set_yscale('log')
+             markersize=3)
+  
   # Дополнительная тонкая линия, соединяющая точки (опционально)
-  ax1.plot(x, mean_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
+  ax1.plot(x, max_s_cvx, color='blue', alpha=0.3, linestyle='--', linewidth=1)
   ax1.tick_params(axis='both', direction='in')
+  ax1.set_title(r"График зависимости $S_{\mathrm{cvx}}$" +"\nот количества измерений")
   ax1.set_xlabel('Количество измерений')
   ax1.set_ylabel(r'$S_{\mathrm{cvx}}$') 
+  ax1.set_xticks(x)
   ax1.set_ylim(-0.1, 1.1)
-  ax1.set_xlim(1, len(x)+0.2)
+  ax1.set_xlim(0.8, len(x)+0.2)
   ax1.grid(True)
-  ax1.legend()
 
   # Вторая subfigure для графика Fidelity
-  ax2 = subfigs[1].subplots()
-  ax2.errorbar(x, fidelity_mean, 
-             yerr=fidelity_std,  # вертикальные погрешности
+  
+  ax2 = fig.add_subplot(gs[2])
+  ax2.errorbar(x, max_fidelity, 
              fmt='o',            # стиль маркера (кружки)
              color='green', 
-             markersize=3, 
-             capsize=4,          # размер "шапочки" погрешности
-             label='Fidelity ± std')
+             markersize=3)
   
   # ax2.set_yscale('log')
   # Дополнительная тонкая линия, соединяющая точки (как в исходном коде)
-  ax2.plot(x, fidelity_mean, color='green', alpha=0.3, linestyle='--', linewidth=1)
+  ax2.plot(x, max_fidelity, color='green', alpha=0.3, linestyle='--', linewidth=1)
   ax2.tick_params(axis='both', direction='in')
+  ax2.set_title("График зависимости Fidelity\nот количества измерений")
   ax2.set_xlabel('Количество измерений')
   ax2.set_ylabel('Fidelity')
   ax2.set_ylim(-0.1, 1.1)
-  ax2.set_xlim(1, len(x) + 0.2)
+  ax2.set_xticks(x)
+  ax2.set_xlim(0.8, len(x) + 0.2)
   ax2.grid(True)
-  ax2.legend(loc='upper left')
   plt.show()
 
 def pl_fid_s_cvx_distr(x, mean_s_cvx, fidelity_mean, s_cvx_distr, title=None):
