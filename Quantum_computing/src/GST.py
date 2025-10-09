@@ -16,7 +16,7 @@ def S_omega(omega, c:float, tau_c:float):
     """
     return (c * tau_c**2) / (1 + (omega * tau_c)**2)
 
-def nascent_Dirac_delta(x, eps=1e-2):
+def nascent_Dirac_delta(x, eps: float=1e-2):
     """
     дельта-функция Дирака вида η_ε(x):
         η_ε(x) = (ε / (π x^2)) * sin^2(x/ε)
@@ -28,7 +28,12 @@ def nascent_Dirac_delta(x, eps=1e-2):
     Возвращает:
         float или массив значений η_ε(x).
     """
-    return (eps / (np.pi * x**2)) * (np.sin(x / eps))**2
+    out = np.empty_like(x, dtype=float)
+    mask_small = np.abs(x) < 1e-12
+    out[mask_small] = 1.0 / (np.pi * eps) 
+    out[~mask_small] = (eps / (np.pi * x[~mask_small]**2)) * np.sin(x[~mask_small] / eps)**2
+
+    return out if out.shape else float(out)
 
 def filter_gamma_1(omega, Omega, t):
     """
