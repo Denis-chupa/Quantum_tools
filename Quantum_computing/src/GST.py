@@ -28,14 +28,10 @@ def nascent_Dirac_delta(x, eps: float=1e-2):
     Возвращает:
         float или массив значений η_ε(x).
     """
-    out = np.empty_like(x, dtype=float)
-    mask_small = np.abs(x) < 1e-12
-    out[mask_small] = 1.0 / (np.pi * eps) 
-    out[~mask_small] = (eps / (np.pi * x[~mask_small]**2)) * np.sin(x[~mask_small] / eps)**2
+    
+    return (1 / (eps * np.pi)) * np.sinc(x / (eps * np.pi))**2
 
-    return out if out.shape else float(out)
-
-def filter_gamma_1(omega, Omega, t):
+def filter_gamma_1(Omega, omega, t):
     """
     Функция фильтрации F_{Γ1}(ω, Ω, t).
     Args:
@@ -47,7 +43,44 @@ def filter_gamma_1(omega, Omega, t):
     """
     return (t/4.0) * (nascent_Dirac_delta(Omega - omega, 2.0 / t) + nascent_Dirac_delta(Omega + omega, 2.0 / t))
 
-def delta_filter_delta_1(omega, Omega, t):
+def _F_limit_at_resonance(Omega, t, sign):
+    # аналитический предел полной суммы при ω→±Ω, где sign=+1 для +Ω, sign=-1 для -Ω )
+    s = 1.0 if sign > 0 else -1.0
+    return s * (t / (8.0 * np.pi * Omega)) - s * (np.sin(2.0 * Omega * t) / (16.0 * np.pi * Omega**2))
+
+def filter_delta_1(Omega, omega, t):
+    """
+    Фильтр F_{Δ1}(ω, Ω, t). Определяется как:
+        F_{Δ1} = (Ω t) / (2π(Ω^2 - ω^2)) + δF_{Δ1}.
+    Args:
+        Omega : частота Ω
+        omega : частота ω
+        t     : время
+    Return:
+        Значение фильтра F_{Δ1}
+    """
+    omega = np.asarray(omega, float)
+    smooth = (Omega * t) / (2.0 * np.pi * (Omega**2 - omega**2))        # ПВ-кусок 
+    full = smooth + delta_filter_delta_1(Omega, omega, t)
+    return full
+    # thr = 1e-6 * max(1.0, 1.0 / t)                                      # масштаб по 1/t 
+    # near_pos = np.abs(omega - Omega) < thr
+    # near_neg = np.abs(omega + Omega) < thr
+
+    # thr = 1e-6 * max(1.0, 1.0 / t)                                      # масштаб по 1/t )
+    # near_pos = np.abs(omega - Omega) < thr
+    # near_neg = np.abs(omega + Omega) < thr
+
+    # if np.any(near_pos) or np.any(near_neg):
+    #     out = np.array(full, copy=True)
+    #     if np.any(near_pos):
+    #         out[near_pos] = _F_limit_at_resonance(Omega, t, +1)
+    #     if np.any(near_neg):
+    #         out[near_neg] = _F_limit_at_resonance(Omega, t, -1)
+    #     return out if out.shape else float(out)
+    # return full if full.shape else float(full)
+
+def delta_filter_delta_1(Omega, omega, t):
     """
     Дополнительный член δF_{Δ1}(ω, Ω, t).
     Args:
@@ -61,20 +94,7 @@ def delta_filter_delta_1(omega, Omega, t):
     term2 = np.sin((omega + Omega)*t) / ((omega + Omega)**2)
     return (term1 - term2) / (4 * np.pi)
 
-def filter_delta_1(omega, Omega, t):
-    """
-    Фильтр F_{Δ1}(ω, Ω, t). Определяется как:
-        F_{Δ1} = (Ω t) / (2π(Ω^2 - ω^2)) + δF_{Δ1}.
-    Args:
-        omega : частота ω
-        Omega : частота Ω
-        t     : время
-    Return:
-        Значение фильтра F_{Δ1}
-    """
-    return (Omega * t) / (2 * np.pi * (Omega**2 - omega**2)) + delta_filter_delta_1(omega, Omega, t)
-
-def filter_gamma_2(omega, Omega, t):
+def filter_gamma_2(Omega, omega, t):
     """
     Функция фильтрации F_{Γ2}(ω, Ω, t).
     Args:
@@ -84,10 +104,10 @@ def filter_gamma_2(omega, Omega, t):
     Возвращает:
         значение фильтра F_{Γ2}.
     """
-    return (2 * np.cos(Omega * t) / (np.pi * (omega**2 - Omega**2))) * \
-           np.sin(0.5 * (omega - Omega) * t) * np.sin(0.5 * (omega + Omega) * t)
+    return (np.cos(Omega * t) * t**2 / (2 * np.pi)) * \
+           np.sinc(0.5 * (omega - Omega) * t / np.pi) * np.sinc(0.5 * (omega + Omega) * t / np.pi)
 
-def filter_delta_2(omega, Omega, t):
+def filter_delta_2(Omega, omega, t):
     """
     Фильтр F_{Δ2}(ω, Ω, t). 
     Args:
@@ -97,10 +117,10 @@ def filter_delta_2(omega, Omega, t):
     Return:
         Значение фильтра F_{Δ2}
     """
-    return (2 * np.sin(Omega * t)/(np.pi * (omega**2 - Omega**2))) * \
-           np.sin(0.5 * (omega - Omega) * t) * np.sin(0.5 * (omega + Omega) * t)
+    return (np.sin(Omega * t) * t**2 / (2 * np.pi)) * \
+           np.sinc(0.5 * (omega - Omega) * t / np.pi) * np.sinc(0.5 * (omega + Omega) * t / np.pi)
 
-def Gamma_n(n, t, Omega, c, tau_c, wmax=500, limit=1000):
+def Gamma_n(n, Omega, c, tau_c, t, wmax, limit=1000):
     """
     Вычисляет коэффициент Γ_n(t).
     
@@ -116,14 +136,14 @@ def Gamma_n(n, t, Omega, c, tau_c, wmax=500, limit=1000):
         значение Γ_n(t).
     """
     if n == 1:
-        integrand = lambda w: S_omega(w, c, tau_c) * filter_gamma_1(w, Omega, t)
+        integrand = lambda w: S_omega(w, c, tau_c) * filter_gamma_1(Omega, w, t)
     elif n == 2:
-        integrand = lambda w: S_omega(w, c, tau_c) * filter_gamma_2(w, Omega, t)
+        integrand = lambda w: S_omega(w, c, tau_c) * filter_gamma_2(Omega, w, t)
     else:
         raise ValueError("n must be 1 or 2")
     return quad(integrand, -wmax, wmax, limit=limit)[0]
 
-def Delta_n(n, t, c, tau_c, Omega, wmax=50, limit=500):
+def Delta_n(n, Omega, c, tau_c, t, wmax, limit=500):
     """
     Вычисляет коэффициент Δ_n(t).
     
@@ -139,9 +159,9 @@ def Delta_n(n, t, c, tau_c, Omega, wmax=50, limit=500):
         значение Δ_n(t).
     """
     if n == 1:
-        integrand = lambda w: S_omega(w, c, tau_c) * filter_delta_1(w, Omega, t)
+        integrand = lambda w: S_omega(w, c, tau_c) * filter_delta_1(Omega, w, t)
     elif n == 2:
-        integrand = lambda w: S_omega(w, c, tau_c) * filter_delta_2(w, Omega, t)
+        integrand = lambda w: S_omega(w, c, tau_c) * filter_delta_2(Omega, w, t)
     else:
         raise ValueError("n must be 1 or 2")
     return quad(integrand, -wmax, wmax, limit=limit)[0]
@@ -232,7 +252,6 @@ def infidelity(rho, sigma):
     """Uhlmann infidelity"""
     return 1 - fidelity(rho, sigma)
 
-
 def algorithm_Heun(dt, t_start, N_steps, q, g, tau_c, c, X_0):
     """
     Один шаг схемы для X(t).
@@ -307,13 +326,104 @@ def evol_Heun(M_mc, dt, t_start, N_steps, q, g, tau_c, c, r_start=None):
 
     return np.array([r_00, r_01, r_10, r_11], dtype=complex) / M_mc
 
+def Gamma_1_analit(t, Omega, tau_c, S_tilde):
+    """
+    Вычисляет коэффициент Γ₁(t).
+
+    Формула:
+        Γ₁(t) = ½ S̃_ω(Ω) * [ 
+            (t - τ_c * (2Ωτ_c / (1 + (Ωτ_c)²)) * e^{-t/τ_c} * sin(Ωt))
+            - τ_c * ((1 - (Ωτ_c)²) / (1 + (Ωτ_c)²)) * (1 - e^{-t/τ_c} * cos(Ωt))
+        ]
+
+    Аргументы:
+        t (float или np.ndarray): время
+        Omega (float): частота Ω
+        tau_c (float): время корреляции τ_c
+        S_tilde (float): спектральная плотность S̃_ω(Ω)
+
+    Возвращает:
+        float или np.ndarray: значение функции Γ₁(t)
+    """
+    term1 = t - tau_c * (2 * (Omega * tau_c) / (1 + (Omega * tau_c)**2)) * np.exp(-t / tau_c) * np.sin(Omega * t)
+    term2 = -tau_c * ((1 - (Omega * tau_c)**2) / (1 + (Omega * tau_c)**2)) * (1 - np.exp(-t / tau_c) * np.cos(Omega * t))
+    return 0.5 * S_tilde * (term1 + term2)
+
+
+def Gamma_2_analit(t, Omega, tau_c, S_tilde):
+    """
+    Вычисляет коэффициент Γ₂(t).
+
+    Формула:
+        Γ₂(t) = ½ S̃_ω(Ω) * cos(Ωt) * [ (1/Ω) sin(Ωt) - τ_c cos(Ωt) + τ_c e^{-t/τ_c} ]
+
+    Аргументы:
+        t (float или np.ndarray): время
+        Omega (float): частота Ω
+        tau_c (float): время корреляции τ_c
+        S_tilde (float): спектральная плотность S̃_ω(Ω)
+
+    Возвращает:
+        float или np.ndarray: значение функции Γ₂(t)
+    """
+    inner = (1 / Omega) * np.sin(Omega * t) - tau_c * np.cos(Omega * t) + tau_c * np.exp(-t / tau_c)
+    return 0.5 * S_tilde * np.cos(Omega * t) * inner
+
+
+def Delta_1_analit(t, Omega, tau_c, S_tilde):
+    """
+    Вычисляет коэффициент Δ₁(t).
+
+    Формула:
+        Δ₁(t) = ½ S̃_ω(Ω) * [
+            t(Ωτ_c)
+            + τ_c * ((1 - (Ωτ_c)²) / (1 + (Ωτ_c)²)) * e^{-t/τ_c} * sin(Ωt)
+            - τ_c * (2Ωτ_c / (1 + (Ωτ_c)²)) * (1 - e^{-t/τ_c} * cos(Ωt))
+        ]
+
+    Аргументы:
+        t (float или np.ndarray): время
+        Omega (float): частота Ω
+        tau_c (float): время корреляции τ_c
+        S_tilde (float): спектральная плотность S̃_ω(Ω)
+
+    Возвращает:
+        float или np.ndarray: значение функции Δ₁(t)
+    """
+    term1 = t * (Omega * tau_c)
+    term2 = tau_c * ((1 - (Omega * tau_c)**2) / (1 + (Omega * tau_c)**2)) * np.exp(-t / tau_c) * np.sin(Omega * t)
+    term3 = -tau_c * (2 * (Omega * tau_c) / (1 + (Omega * tau_c)**2)) * (1 - np.exp(-t / tau_c) * np.cos(Omega * t))
+    return 0.5 * S_tilde * (term1 + term2 + term3)
+
+
+def Delta_2_analit(t, Omega, tau_c, S_tilde):
+    """
+    Вычисляет коэффициент Δ₂(t).
+
+    Формула:
+        Δ₂(t) = ½ S̃_ω(Ω) * [ (1/Ω) sin²(Ωt) - (τ_c/2) sin(2Ωt) + τ_c e^{-t/τ_c} ]
+
+    Аргументы:
+        t (float или np.ndarray): время
+        Omega (float): частота Ω
+        tau_c (float): время корреляции τ_c
+        S_tilde (float): спектральная плотность S̃_ω(Ω)
+
+    Возвращает:
+        float или np.ndarray: значение функции Δ₂(t)
+    """
+    term = (1 / Omega) * np.sin(Omega * t)**2 - (tau_c / 2) * np.sin(2 * Omega * t) + tau_c * np.exp(-t / tau_c)
+    return 0.5 * S_tilde * term
+
+
+
 def non_mark_noise(t_j, rabi, c, tau_c, r_start):
 
     state_plus = np.array([[1],[1]])/2**0.5
     state_minus = np.array([[1],[-1]])/2**0.5
 
     delt_1 = Delta_n(1, t_j, c, tau_c, rabi)
-    prob = (1 - np.exp(-Gamma_n(1, t_j, rabi, c, tau_c)))
+    prob = (1 - np.exp(-Gamma_1_analit(t_j, rabi, tau_c, S_omega(rabi, c, tau_c))))
     paul_x = np.array([[0, 1], [1, 0]], dtype=complex)
 
     K_1 = prob**0.5 * (np.cos(rabi * t_j) * state_plus @ state_minus.T.conj() +\
